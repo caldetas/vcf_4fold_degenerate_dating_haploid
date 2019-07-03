@@ -35,7 +35,7 @@ def main(argv):
             \n\t*new_ref specified takes all the valid snp\'s of the sample\
             \n\t and inverts the var/ref values of all other samples*\
             \n\t*for parsing adaptions search\'parsing\' in script*\
-            \n\t*in multivariant mode each variant is seen as a own spn*\
+            \n\t*in multivariant mode each variant is seen as a own snp*\
             \n\t\
             \ninstall packages: https://scipy.org/install.html\
             \nubuntu: sudo apt-get install python-numpy python-pandas\
@@ -90,62 +90,10 @@ def main(argv):
            variant = 'single'
 
 
-
-
-
-
-
-    '''
-    global settings
-    class settings:
-        
-        def __init__(self, arg):
-            self.arg = arg
-
-        
-    
-    
-    class dataframes:
-        
-        def __init__(self, name):
-            self.name = name
-            self.list = []
-            self.listname = []
-        
-        def add_df(self, arg):
-            self.list.append(arg)
-    
-        def add_df_name(self, arg):
-            self.listname.append(arg)
-    
-    
-    
-    
-    c = student('coco')
-    m = student('manu')
-    
-    c.add_region('WALLIS')
-    c.add_region('ZUREICH')
-    m.add_region('TICINO')
-    m.add_region('ZUREICH')
-    print(c.name, '\t', c.regions)
-    print(m.name, '\t', m.regions)
-        
-
-
-
-    new_ref = settings('FR')
-
-    print(mindiff.arg)
-    print(new_ref.arg)
-    print(settings)
-    ''' 
-
-#    global minfrac
-#    global mindiff
     mindiff = 1
     minfrac = 0.05
-#    global sample_col
+
+
     #which column does the sample start?
     sample_col = 4
 
