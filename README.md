@@ -10,7 +10,6 @@ use option "-h" or "--help" for further information
 ## MANUAL
 
     vcf_4fold_degenerate_dating.py            
-	            
         --mincov <minimum_coverages> *opt,comma separated integers in order of sample appearance in vcf*            
         --single *opt, consider only single variants(default=all)*            
         --multi *opt, consider only multi variants(default=all)*            
