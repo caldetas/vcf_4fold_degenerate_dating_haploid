@@ -6,7 +6,7 @@ analysing only the protein-coding sequences
   to adapt the parsing of gene-name search "parsing" in the script
 
 
-### MANUAL
+#### MANUAL
 
     vcf_4fold_degenerate_dating.py            
 	            
