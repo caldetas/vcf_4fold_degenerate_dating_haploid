@@ -28,7 +28,7 @@ use option "-h" or "--help" for further information
 	*new_ref specified takes all the valid snp's of the sample            
 	 and inverts the var/ref values of all other samples*            
 	*for parsing adaptions search'parsing' in script*            
-	*in multivariant mode each variant is seen as a own spn*      
+	*in multivariant mode each variant is seen as a own snp*      
 	            
 install packages: https://scipy.org/install.html            
 ubuntu: sudo apt-get install python-numpy python-pandas   
