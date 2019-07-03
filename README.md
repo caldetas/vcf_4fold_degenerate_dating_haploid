@@ -1,7 +1,11 @@
 # vcf_4fold_degenerate_dating_haploid
 a script to determine the branching points of different organisms  
 using the 4fold degenerate dating method  
-analysing only the protein-coding sequences  
+analysing only the protein-coding sequences
+
+## Mutation Rate
+The mutation rate used is the mutation Rate of *A.thaliana*  
+1.3*(10**-8) *Substitutions/year*
   
 to adapt the parsing of gene-name search "parsing" in the script  
 use option "-h" or "--help" for further information
