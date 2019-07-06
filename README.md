@@ -1,16 +1,14 @@
 # vcf_4fold_degenerate_dating_haploid
-a script to determine the branching points of different organisms  
-using the 4fold degenerate dating method  
-analysing only the protein-coding sequences
+A script for dating the branching points of different organisms, using the 4fold degenerate dating method, analysing the mutations in the protein-coding sequences.  
 
 ## Mutation Rate
-The mutation rate used is the mutation Rate of *A.thaliana*  
+The mutation rate used is the mutation Rate of *A.thaliana*.  
 1.3*(10**-8) *Substitutions/year*
   
-To adapt the parsing of gene-name search "parsing" in the script  .
-Use option "-h" or "--help" for further information.
-The "--ref" changes the refernce sample mutations (usually ~0). The option counts all the non mutated 4fdg sites, in which any other sample has a mutation, as a snp for the reference sample (gives total snp's organism).
-The "--new_ref" option is very usefull. Set a new reference sample to get better dating-resolution in the new-ref's branch.
+To adapt the parsing of gene-name search "parsing" in the script.  
+Use option "-h" or "--help" for further information.  
+The "--ref" changes the refernce sample mutations (usually ~0). The option counts all the non mutated 4fdg sites, in which any other sample has a mutation, as a snp for the reference sample (gives total snp's organism).  
+The "--new_ref" option is very usefull. Set a new reference sample to get better dating-resolution in the new-ref's branch.  
 
 ## MANUAL
 
