@@ -34,4 +34,5 @@ The "--new_ref" option is very usefull. Set a new reference sample to get better
 	*in multivariant mode each variant is seen as a own snp*      
 	            
 install packages: https://scipy.org/install.html            
-ubuntu: sudo apt-get install python-numpy python-pandas   
+ubuntu: sudo apt-get install python-numpy python-pandas  
+conda:	conda install -c conda-forge pandas
