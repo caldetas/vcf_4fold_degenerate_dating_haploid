@@ -22,6 +22,7 @@ def main(argv):
             \n\t--multi *opt, consider only multi variants(default=all)*\
             \n\t--print_histo_df *opt,safe histogram df for R*\
             \n\t--save_filtered_vcfs *opt,safe filtered lowcut vcf\'s for each sample*\
+            \n\t--ffdg_pos_output *opt,safe ffdg positions on contigs*\
             \n\t--ref <ref_sample_name> *opt,specify which sample is ref,filters all snps for ref*\
             \n\t--new_ref *define one of the samples as new outgroup*\
             \n\t--transcript <maker.fa>\
@@ -54,10 +55,11 @@ def main(argv):
     save_filtered_vcfs = 0
     mincov = 0
     new_ref = ''
+    ffdg_pos_output = 0
 
 
     try:
-       opts, args = getopt.getopt(argv,"h",['mincov=', 'transcript=', 'gff=', 'vcf=', 'ref=', 'vcf=', 'new_ref=', 'print_histo_df', 'save_filtered_vcfs', 'single', 'multi'])
+       opts, args = getopt.getopt(argv,"h",['mincov=', 'transcript=', 'gff=', 'vcf=', 'ref=', 'vcf=', 'new_ref=', 'ffdg_pos_output', 'print_histo_df', 'save_filtered_vcfs', 'single', 'multi'])
     except getopt.GetoptError:
        print ('{}'.format(form))
        sys.exit()
@@ -85,6 +87,8 @@ def main(argv):
            save_filtered_vcfs = 1  
        elif opt == '--ref':
            ref = arg
+       elif opt == '--ffdg_pos_output':
+           ffdg_pos_output = 1
        elif opt == '--new_ref':
            new_ref = arg
            variant = 'single'
@@ -786,6 +790,8 @@ def main(argv):
 
     df_filtered_vcf = filter_vcf(vcf, variant, ref, save_filtered_vcfs, df_histo, mincov)          #, mindiff, minfrac)
     ffdg_positions_on_ctgs, cds_positions = get_pos_ffdg_on_contigs(transcript, gff)
+    if ffdg_pos_output == 1:
+        ffdg_positions_on_ctgs.to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
     '''
     print('print(df_filtered_vcf)')
     print(df_filtered_vcf)
