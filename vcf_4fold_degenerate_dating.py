@@ -7,8 +7,29 @@ Created on Mon Oct 29 14:34:57 2018
 #!/usr/bin/env python3
 """
 
+class data:
+    
+    def __init__(self):
+            self.df = {}
+            self.settings = {}
+
+    def add_df(self, tipe, df):
+        self.df[tipe] = df
+
+    def add_setting(self, name, settings):
+        self.settings[name] = settings
+
+
+#init class data
+data = data()
+
+
 import sys
 import getopt
+import math    
+import pandas as pd
+import numpy as np
+import re
 
 
 
@@ -41,21 +62,19 @@ def main(argv):
             \ninstall packages: https://scipy.org/install.html\
             \nubuntu: sudo apt-get install python-numpy python-pandas\
             \n\t'
-    
-    import math    
-    import pandas as pd
-    import numpy as np
-    import re
 
-    #values
-    vcf = ''
-    variant = ''
-    ref = 'NA' #for vcf's without ref-sample mapped: comment this line
-    df_histo = 0
-    save_filtered_vcfs = 0
-    mincov = 0
-    new_ref = ''
-    ffdg_pos_output = 0
+
+
+    data.add_setting('vcf', 0)
+    data.add_setting('variant', '')
+    data.add_setting('ref', 'NA')
+    data.add_setting('df_histo', 0)
+    data.add_setting('save_filtered_vcfs', 0)
+    data.add_setting('mincov', 0)
+    data.add_setting('new_ref', '')
+    data.add_setting('ffdg_pos_output', 0)
+
+
 
 
     try:
@@ -68,56 +87,49 @@ def main(argv):
           print ('{}'.format(form))
           sys.exit()
        elif opt == '--transcript':
-          transcript = arg
+          data.add_setting('transcript', arg)
        elif opt == '--gff':
-          gff = arg       
+          data.add_setting('gff', arg)
        elif opt == '--vcf':
-          vcf = arg
+           data.add_setting('vcf', arg)
        elif opt == '--single':
-          variant = 'single'
+          data.add_setting('variant', 'single')
        elif opt == '--multi':
-          variant = 'multi'
+          data.add_setting('variant', 'multi')
        elif opt == '--mincov':
            mincov = arg.split(sep=',')
            for i in range(len(mincov)):
                mincov[i] = int(mincov[i])
+               data.add_setting('mincov', mincov)
        elif opt == '--print_histo_df':
-           df_histo = 1  
+           data.add_setting('print_histo_df', 1)  
        elif opt == '--save_filtered_vcfs':
-           save_filtered_vcfs = 1  
+           data.add_setting('save_filtered_vcfs', 1) 
        elif opt == '--ref':
-           ref = arg
+           data.add_setting('ref', arg)
        elif opt == '--ffdg_pos_output':
-           ffdg_pos_output = 1
+           data.add_setting('ffdg_pos_output', 1)
        elif opt == '--new_ref':
-           new_ref = arg
-           variant = 'single'
+           data.add_setting('new_ref', arg)
+           data.settings['variant'] = 'single'
 
-
-    mindiff = 1
-    minfrac = 0.05
+    #filtering options
+    data.add_setting('mindiff', 1)
+    data.add_setting('minfrac', 0.05)
 
 
     #which column does the sample start?
-    sample_col = 4
+    data.add_setting('sample_col', 4)
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-    def get_variant_histograms(vcf, new_ref):
+# =============================================================================
+#     read the vcf file and create a coverage table
+# =============================================================================
+    def get_variant_histograms():
         df = []
-        ass=open('{}'.format(vcf))
+        ass=open('{}'.format(data.settings['vcf']))
         header = 0
         cnt=0
         for line in ass:
@@ -135,19 +147,19 @@ def main(argv):
                     temp_list.append('substitution')
                     temp_list.append('multi_var')
                     #temp_list.extend(line[9:])
+                    #make sample index
+                    prefix = []
                     for i in range(len(line[9:])):
                         temp = line[9+i]
                         temp_list.extend(['{}_ref'.format(temp), '{}_var'.format(temp)])
                         temp = ''
-                    #print(temp_list)
                     df.append(temp_list)
                     header = temp_list
                     temp_list = []
-                    #debug
-                    if new_ref != '':
-                        for i in [i for i,x in enumerate(header) if x == '{}_ref'.format(new_ref)]:
+                    if data.settings['new_ref'] != '':
+                        for i in [i for i,x in enumerate(header) if x == '{}_ref'.format(data.settings['new_ref'])]:
                             new_ref_ref = i
-                        for i in [i for i,x in enumerate(header) if x == '{}_var'.format(new_ref)]:
+                        for i in [i for i,x in enumerate(header) if x == '{}_var'.format(data.settings['new_ref'])]:
                             new_ref_var = i                    
             else:
                 #first contig 
@@ -167,225 +179,152 @@ def main(argv):
                                 temp_list.append('tv')
                         temp_list.append('no') #multi_var
                         temp_list.extend(line[9:])
-#                        print(temp_list)
                         #parsing AD-allele position
                         for i in (i for i,x in enumerate(line[8].split(':')) if x == 'AD'):
                             AD_pos = i
                         #select values reference/variance mappings
-                        for i in range(len(temp_list[sample_col:])):
-                            if temp_list[i+sample_col][0] != '.':
-                                temp_list[i+sample_col] = temp_list[i+sample_col].split(sep=':')[AD_pos] #parsing vcf AD allele cov.
+                        for i in range(len(temp_list[data.settings['sample_col']:])):
+                            if temp_list[i+data.settings['sample_col']][0] != '.':
+                                temp_list[i+data.settings['sample_col']] = temp_list[i+data.settings['sample_col']].split(sep=':')[AD_pos] #parsing vcf AD allele cov.
                             else:
-                                temp_list[i+sample_col] = 'NA'
+                                temp_list[i+data.settings['sample_col']] = 'NA'
                         #new_ref sample specified??
-                        if new_ref != '':
-                            if len(temp_list[sample_col].split(sep=',')) >= 2:            
+                        if data.settings['new_ref'] != '':
+                            if len(temp_list[data.settings['sample_col']].split(sep=',')) >= 2:            
                                 #print single variants
-                                if len(temp_list[sample_col].split(sep=',')) == 2:
-                                    
+                                if len(temp_list[data.settings['sample_col']].split(sep=',')) == 2:
                                     #separate values for reference / variants on diff. columns
                                     temp_final = temp_list.copy()
-                                    temp_final.extend(['']*len(temp_list[sample_col:]))
-                                    for i in range(len(temp_list[sample_col:])):
-#                                        print(temp_final[sample_col+i*2])
-                                        if temp_list[i+sample_col] != 'NA':
-                                            temp_final[sample_col+i*2] = temp_list[sample_col+i].split(sep=',')[0]
-                                            temp_final[sample_col+i*2+1] = temp_list[sample_col+i].split(sep=',')[1]
+                                    temp_final.extend(['']*len(temp_list[data.settings['sample_col']:]))
+                                    for i in range(len(temp_list[data.settings['sample_col']:])):
+                                        if temp_list[i+data.settings['sample_col']] != 'NA':
+                                            temp_final[data.settings['sample_col']+i*2] = temp_list[data.settings['sample_col']+i].split(sep=',')[0]
+                                            temp_final[data.settings['sample_col']+i*2+1] = temp_list[data.settings['sample_col']+i].split(sep=',')[1]
                                         else:
-                                            temp_final[sample_col+i*2] = np.NaN
-                                            temp_final[sample_col+i*2+1] = np.NaN 
+                                            temp_final[data.settings['sample_col']+i*2] = np.NaN
+                                            temp_final[data.settings['sample_col']+i*2+1] = np.NaN 
                                     #only select filtered values for good new_ref snps
-                                    if float(temp_final[new_ref_ref]) - float(temp_final[new_ref_var]) >= float(mindiff):
-                                        if float(temp_final[new_ref_var])/float(temp_final[new_ref_ref]) <= float(minfrac):
+                                    if float(temp_final[new_ref_ref]) - float(temp_final[new_ref_var]) >= float(data.settings['mindiff']):
+                                        if float(temp_final[new_ref_var])/float(temp_final[new_ref_ref]) <= float(data.settings['minfrac']):
                                             df.append(temp_final)
-#                                            print('original:')    #debug                                           
-#                                            print(temp_final) #debug
-#                                            print()    #debug 
                                     #invert all other samples if new_ref has a valid snp
-                                    elif float(temp_final[new_ref_var]) - float(temp_final[new_ref_ref]) >= float(mindiff):
-                                        if float(temp_final[new_ref_ref])/float(temp_final[new_ref_var]) <= float(minfrac):
-#                                            print(temp_line)    #debug 
-                                            for i in range(len(header[sample_col:])//2):
-#                                                if header[sample_col +2*i][:-4] != new_ref:
-                                                temp = temp_final[sample_col +2*i]
-                                                temp_final[sample_col +2*i] = temp_final[sample_col +2*i +1]
-                                                temp_final[sample_col +2*i +1] = temp
+                                    elif float(temp_final[new_ref_var]) - float(temp_final[new_ref_ref]) >= float(data.settings['mindiff']):
+                                        if float(temp_final[new_ref_ref])/float(temp_final[new_ref_var]) <= float(data.settings['minfrac']):
+                                            for i in range(len(header[data.settings['sample_col']:])//2):
+                                                temp = temp_final[data.settings['sample_col'] +2*i]
+                                                temp_final[data.settings['sample_col'] +2*i] = temp_final[data.settings['sample_col'] +2*i +1]
+                                                temp_final[data.settings['sample_col'] +2*i +1] = temp
                                                 temp = ''
                                             df.append(temp_final)
-#                                            print('inverted:')    #debug                                           
-#                                            print(temp_final) #debug
-#                                            print()    #debug 
                         else:
-                            if len(temp_list[sample_col].split(sep=',')) >= 2:            
+                            if len(temp_list[data.settings['sample_col']].split(sep=',')) >= 2:            
                                 #is it multi-var?
-                                if len(temp_list[sample_col].split(sep=',')) > 2:
-                                    for j in range(len(temp_list[sample_col].split(sep=','))-1):
+                                if len(temp_list[data.settings['sample_col']].split(sep=',')) > 2:
+                                    for j in range(len(temp_list[data.settings['sample_col']].split(sep=','))-1):
                                         #create list
                                         temp_multi = temp_list.copy()
                                         #separate values for reference / variants on diff. columns
                                         temp_final = temp_multi.copy()
-                                        temp_final.extend(['']*len(temp_multi[sample_col:]))
+                                        temp_final.extend(['']*len(temp_multi[data.settings['sample_col']:]))
                                         #multi-var
                                         temp_final[3] = 'yes'
                                         #go trhough samples, make reference and variance column
-                                        for i in range(len(temp_list[sample_col:])):
-                                            if temp_list[i+sample_col] != 'NA':
+                                        for i in range(len(temp_list[data.settings['sample_col']:])):
+                                            if temp_list[i+data.settings['sample_col']] != 'NA':
                                                 #separate values for reference / variants on diff. columns
-                                                temp_final[sample_col+i*2] = temp_multi[sample_col+i].split(sep=',')[0]
-                                                temp_final[sample_col+i*2+1] = temp_multi[sample_col+i].split(sep=',')[j+1]
+                                                temp_final[data.settings['sample_col']+i*2] = temp_multi[data.settings['sample_col']+i].split(sep=',')[0]
+                                                temp_final[data.settings['sample_col']+i*2+1] = temp_multi[data.settings['sample_col']+i].split(sep=',')[j+1]
                                                 
                                             else:
                                                 #write NA's in two columns
-                                                temp_final[sample_col+i*2] = np.NaN #'NA'
-                                                temp_final[sample_col+i*2+1] = np.NaN #'NA'                         
+                                                temp_final[data.settings['sample_col']+i*2] = np.NaN #'NA'
+                                                temp_final[data.settings['sample_col']+i*2+1] = np.NaN #'NA'                         
                                         #print line                                
                                         df.append(temp_final)
                                         temp_final = []
                                         temp_multi = []
                                 #print single variants
-                                elif len(temp_list[sample_col].split(sep=',')) == 2:
+                                elif len(temp_list[data.settings['sample_col']].split(sep=',')) == 2:
                                     #separate values for reference / variants on diff. columns
                                     temp_final = temp_list.copy()
-                                    temp_final.extend(['']*len(temp_list[sample_col:]))
-                                    for i in range(len(temp_list[sample_col:])):
-#                                        print(temp_final[sample_col+i*2])
-                                        if temp_list[i+sample_col] != 'NA':
-                                            temp_final[sample_col+i*2] = temp_list[sample_col+i].split(sep=',')[0]
-                                            temp_final[sample_col+i*2+1] = temp_list[sample_col+i].split(sep=',')[1]
+                                    temp_final.extend(['']*len(temp_list[data.settings['sample_col']:]))
+                                    for i in range(len(temp_list[data.settings['sample_col']:])):
+                                        if temp_list[i+data.settings['sample_col']] != 'NA':
+                                            temp_final[data.settings['sample_col']+i*2] = temp_list[data.settings['sample_col']+i].split(sep=',')[0]
+                                            temp_final[data.settings['sample_col']+i*2+1] = temp_list[data.settings['sample_col']+i].split(sep=',')[1]
                                         else:
-                                            temp_final[sample_col+i*2] = np.NaN
-                                            temp_final[sample_col+i*2+1] = np.NaN                      
+                                            temp_final[data.settings['sample_col']+i*2] = np.NaN
+                                            temp_final[data.settings['sample_col']+i*2+1] = np.NaN                      
                                     df.append(temp_final)
             temp_list = []
-
+        #store the vcf table
         ass.close()
         df = pd.DataFrame(df)
         df.columns = df.iloc[0]
         df = df.reindex(df.index.drop(0))
         df = df.reset_index(drop=True)
-        for column in list(df.columns)[sample_col:]:
+        for column in list(df.columns)[data.settings['sample_col']:]:
             df[column] = df[column].astype(np.float64)
         df['POS'] = df['POS'].astype(int)
-        vcf_total = df
-        del df
-#        print('vcf_total') #debug
-#        print(vcf_total) #debug
-        return vcf_total
+        data.add_df('vcf_total', df)
+        prefix = []
+        for i in range(len(data.df['vcf_total'].columns.tolist()[data.settings['sample_col']:])):
+            if i % 2 == 0:
+                prefix.append(data.df['vcf_total'].columns.tolist()[data.settings['sample_col']:][i][:-4])
+        data.add_setting('prefix', prefix)
+        data.df['vcf_total'].loc[:,'check'] = data.df['vcf_total'].contig.map(str) + ',' + data.df['vcf_total'].POS.map(str)
+        return
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def filter_vcf(vcf, variant, ref, save_filtered_vcfs, df_histo, mincov):#, mindiff, minfrac):
-
-        if ref == '':
-            print()
-            print('ERROR: ref-sample not specified')
-            print()
-            print ('{}'.format(form))
-            sys.exit()        
+    def filter_vcf():
         
-        
-        #filtering
-#        global mindiff #diff from var coverage to ref coverage
-#        global minfrac #fraction from variance coverage to reference coverage
-
-
-        
-        #make coverage tables with single/multi
-
-#        print('get_variant_histograms(vcf)') #debug
         print()
         print()
+        get_variant_histograms()
+        lyst = list(data.df['vcf_total'].columns)[data.settings['sample_col']:]
 
-        df = get_variant_histograms(vcf, new_ref)
-        global df_vcf_total
-        df_vcf_total = df
-
-#        print(df) #debug
-
-
-        lyst = list(df.columns)[sample_col:]
-#        print(lyst) #debug
         #only single vcf
-
-        if variant == 'single':
-            df = df.loc[df.loc[:,'multi_var']== 'no']
-        if variant == 'multi':
-            df = df.loc[df.loc[:,'multi_var']== 'yes']
-        
-        if mincov != 0:
-            if len(lyst)//2 != len(mincov):
+        #or only multi var snps?
+        if data.settings['variant'] == 'single':
+            data.df['vcf_total'] = data.df['vcf_total'].loc[data.df['vcf_total'].loc[:,'multi_var']== 'no']
+        if data.settings['variant'] == 'multi':
+            data.df['vcf_total'] = data.df['vcf_total'].loc[data.df['vcf_total'].loc[:,'multi_var']== 'yes']
+        if data.settings['mincov'] != 0:
+            if len(data.settings['prefix']) != len(mincov):
                 print()
                 print()
                 print('ERROR: number of mincov values does not match number of samples')
                 print()
                 print ('{}'.format(form))
                 sys.exit()
-    
-        #df dictionary
-        d_df = {}
-    
-#        print(df) #debug
+        #df dictionary with filtered vcf snps for every sample
+        df_filtered_vcf = {}
         #variants calculation
         for i in range(len(lyst)//2):
-
-
-#            print('type:', type(df.loc[0,lyst[2*i+1]]))
             #reference
-            if lyst[2*i+1][:-4] == ref:
-                    d_df[ref] = df.loc[   (df.loc[:,lyst[2*i]]-df.loc[:,lyst[2*i+1]] >= mindiff)   &   (df.loc[:,lyst[2*i+1]]/df.loc[:,lyst[2*i]] <= minfrac)   ]
-                    if mincov != 0:
-                        d_df[ref] = d_df[ref].loc[   d_df[ref].loc[:,lyst[2*i]] >= mincov[i]] 
-            
+            if lyst[2*i+1][:-4] == data.settings['ref']:
+                    df_filtered_vcf[data.settings['ref']] = data.df['vcf_total'].loc[   \
+                            
+                            (data.df['vcf_total'].loc[:,lyst[2*i]]-data.df['vcf_total'].loc[:,lyst[2*i+1]] >= data.settings['mindiff'])   &   \
+                            (data.df['vcf_total'].loc[:,lyst[2*i+1]]/data.df['vcf_total'].loc[:,lyst[2*i]] <= data.settings['minfrac'])   ]
+                    if data.settings['mincov'] != 0:
+                        df_filtered_vcf[data.settings['ref']] = df_filtered_vcf[data.settings['ref']].loc[    df_filtered_vcf[data.settings['ref']].loc[:,lyst[2*i]] >= data.settings['mincov'][i]] 
             #variant
             else:
-                    d_df[lyst[2*i+1][:-4]] = df.loc[   (df.loc[:,lyst[2*i+1]]-df.loc[:,lyst[2*i]] >= mindiff)   &   (df.loc[:,lyst[2*i]]/df.loc[:,lyst[2*i+1]] <= minfrac)   ]
-                    if mincov != 0:
-                        d_df[lyst[2*i+1][:]] = d_df[lyst[2*i+1][:]].loc[   d_df[lyst[2*i+1][:]].loc[:,lyst[2*i+1]] >= mincov[i]]
-    
-    
-        #output on terminal (verbose)
-        #safe df for return
-        df_filtered_vcf = d_df.copy()
-        #make smaller for ram
-#        print(d_df)
-        
-    
-        if mincov != 0:
+                    df_filtered_vcf[lyst[2*i+1][:-4]] = data.df['vcf_total'].loc[   \
+                            (data.df['vcf_total'].loc[:,lyst[2*i+1]]-data.df['vcf_total'].loc[:,lyst[2*i]] >= data.settings['mindiff'])   &   \
+                            (data.df['vcf_total'].loc[:,lyst[2*i]]/data.df['vcf_total'].loc[:,lyst[2*i+1]] <= data.settings['minfrac'])   ]
+                    
+                    if data.settings['mincov'] != 0:
+                        df_filtered_vcf[lyst[2*i+1][:]] = df_filtered_vcf[lyst[2*i+1][:]].loc[   df_filtered_vcf[lyst[2*i+1][:]].loc[:,lyst[2*i+1]] >= data.settings['mincov'][i]]
+        if data.settings['mincov'] != 0:
             table = []
             for i in range(len(lyst)//2):
                 table.append(['mincov {}:'.format(lyst[2*i+1][:])])
                 table[-1].append(mincov[i])
             table = pd.DataFrame(table)
-            
             table = table.set_index([0])
             table.columns = table.iloc[0]
             table = table.reindex(table.index.drop('mincov {}:'.format(lyst[2*0+1][:])))
@@ -395,41 +334,26 @@ def main(argv):
             print('Minimal Coverages:')
             print()
             print(table)
-    
-    
-    
-        if df_histo == 1:
-    
-            pd.options.mode.chained_assignment = None  # default='warn' disabled
-            df_rstudio = df.copy()
-            df_rstudio['check'] = df_rstudio.contig.map(str) + ',' + df_rstudio.POS.map(str)
-    
-            #print(df)
-            for i in list(d_df):
-    
-                d_df[i]['check'] = d_df[i].contig.map(str) + ',' + d_df[i].POS.map(str)
-    
-                
-                df_rstudio.loc[~df_rstudio['check'].isin(d_df[i]['check']),('{}_ref'.format(i), '{}_var'.format(i))] = np.NAN
+
+        if data.settings['df_histo'] == 1:
+
+            df_rstudio = data.settings['vcf_total'].copy()
+            for i in list(df_filtered_vcf):
+                df_filtered_vcf[i].loc[:,'check'] = df_filtered_vcf[i].contig.map(str) + ',' + df_filtered_vcf[i].POS.map(str)
+                df_rstudio.loc[~df_rstudio['check'].isin(df_filtered_vcf[i]['check']),('{}_ref'.format(i), '{}_var'.format(i))] = np.NAN
             del df_rstudio['check']
             df_rstudio.iloc[:,5:] = df_rstudio.iloc[:,5:].astype(float)
             df_rstudio = df_rstudio.fillna('NA')
             #save csv
-            df_rstudio.to_csv(path_or_buf='df_rstudio_{}'.format(vcf\
+            df_rstudio.to_csv(path_or_buf='df_rstudio_{}'.format(data.settings['vcf']\
                               .replace('.vcf', '')\
                               .replace('.gvcf', '')\
                               .replace('.g.vcf', '')), sep='\t', index = False)
-    
-            print(df_rstudio)
-    
-    
-        if save_filtered_vcfs == 1:
-    
-    
-            for i in range(len(lyst)//2):
+        if data.settings['save_filtered_vcfs'] == 1:
+            for i in range(len(data.settings['prefix'])):
                 contig = ''
-                vcf = open('{}'.format(vcf))
-                out = open('{}.vcf'.format(lyst[i*2][:]), 'w')
+                vcf = open('{}'.format(data.settings['vcf']))
+                out = open('{}_only_ffdgs.vcf'.format(data.settings['prefix'][i]), 'w')
                 for line in vcf:
                     line = line.strip('\n')
                     #print commented lines
@@ -439,42 +363,27 @@ def main(argv):
                         #set df of chr
                         if int(line.split()[0]) != contig:
                             contig = int(line.split()[0])
-    
-                            df_temp = d_df[lyst[i*2][:]].loc[   d_df[lyst[i*2][:]].loc[:,'contig'] == contig].loc[:,('contig','POS')]
+                            df_temp = df_filtered_vcf[data.settings['prefix'][i]].loc[   df_filtered_vcf[data.settings['prefix'][i]].loc[:,'contig'] == str(contig)].loc[:,('contig','POS')]
                             df_temp = list(df_temp.loc[:,'POS'])
-    
-    
-                        #print snp if in df
+                       #print snp if in df
                         if int(line.split()[1]) in df_temp:
                             print(line,file=out)
-    
                 out.close()
                 vcf.close()
-    
-        return df_filtered_vcf
+        data.add_df('df_filtered_vcf', df_filtered_vcf)
+        return
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-    def get_pos_ffdg_on_contigs(transcript, gff):
+    def get_pos_ffdg_on_contigs():
         
+        print()
         print()
         print('..reading transcript.fasta..')
         print()
-        
         header = ''
-        fa = open('{}'.format(transcript))
+        fa = open('{}'.format(data.settings['transcript']))
         seq = ''
         lyst_fa = {}
         first = 0
@@ -483,16 +392,11 @@ def main(argv):
             if line[0] == '>':
                 if first == 1:
                     lyst_fa[header] = seq
-                    #print(lyst_fa[header])
                     header = line.split()[0][1:] #parsing fasta
-                    #print(header)
-                    
                     seq = ''
                 else:
                     first = 1
                     header = line.split()[0][1:] #parsing fasta
-                    #print(header)
-    
             else:
                 seq += line
                 
@@ -500,31 +404,25 @@ def main(argv):
         lyst_fa[header] = seq
         seq = ''
         fa.close()
-#        print(lyst_fa) #debug
         print()
         print('..indexing fourfold-degenerate sites..')
         print()
-        
-    
+
         pos_fa = {}
-        #4-fold degenerate codons
         fold = ['CT', 'GT', 'TC', 'CC', 'AC', 'GC', 'CG', 'GG']
         for gene in lyst_fa:
             pos_fa[gene] = []
-#            print(pos_fa)
             for i in range(len(lyst_fa[gene])//3):
                 if lyst_fa[gene][3*i:3*i+2] in fold:
                    pos_fa[gene].append(i*3+2+1)  #!!real position, +1
         del lyst_fa
-        #print(pos_fa)
-        
+
         print()
         print('..indexing gff gene positions from exons..')
         print()
-        
-        
+
         #open gff
-        gff = open('{}'.format(gff))
+        gff = open('{}'.format(data.settings['gff']))
         #make cds positions index
         cds_positions = {'check':[]}
         
@@ -536,17 +434,18 @@ def main(argv):
                     line = line.split()
                     if len(line) >= 8:
                         if len(line[8].split(sep=';')) > 1:
-    
                             if line[2] == 'exon':
-#                                print('exon found') #debug
-    
-                                #parsing the gene name !!!important!!!
-                                #has to be the same as the gene name parsed from cds fasta
-                                #check if sep=';' or sep=':'
+# =============================================================================
+#                                 parsing the gene name !!!important!!!
+#                                 has to be the same as the gene name parsed from cds fasta
+#                                 check if sep=';' or sep=':'
+# =============================================================================
+                                
 #                                gene = line[8].split(sep=';')[0].split(sep='=')[1].split('.')[0] #gatk
                                 gene = line[8].split(sep=':')[0].split(sep='=')[1] #freebayes
+
+
                                 if gene not in cc:
-#                                    print(gene) #debug
                                     cc[gene] = []
                                     cc[gene].append([line[0], gene, line[3], line[4], line[6], 
                                        1+abs(int(line[3])-int(line[4]))]) #add 1! #parsing gff
@@ -554,65 +453,43 @@ def main(argv):
                                 else:
                                     cc[gene].append([line[0], gene, line[3], line[4], line[6], 
                                        1+abs(int(line[3])-int(line[4]))]) #add 1! #parsing gff
-                                #parsing explained:
-                                #[line[0], gene, line[3], line[4], line[6], 1+abs(int(line[3])-int(line[4]))]
-                                #[contig, gene, start_bp, stop_bp, orientation(+/-), length(stop - start)]
-                                
-                                #append positions to cds_positions
+# =============================================================================
+#                                 parsing explained:
+#                                 [line[0], gene, line[3], line[4], line[6], 1+abs(int(line[3])-int(line[4]))]
+#                                 [contig, gene, start_bp, stop_bp, orientation(+/-), length(stop - start)]
+#                                 
+#                                 append positions to cds_positions
+# =============================================================================
                                 for i in range(int(line[4])-int(line[3])+1):
                                     contig = line[0]
                                     pos = str(i + int(line[3]))
                                     cds_positions['check'].append(contig + ',' + pos)
             else:
                 break
-#                print('break')#debug
-#        print('cc:', cc) #debug
         gff.close()
         cds_positions = pd.DataFrame(cds_positions)
-#        print(cds_positions) #debug
-
-        '''
-        for i in cc:
-            print(i)
-            print(cc[i])       
-        print('print(cc[i])') 
-        '''                                                                                                                                     
+                                                                                                               
         for i in cc:
             cc[i] = pd.DataFrame(cc[i])
-            '''
-            print(cc[i])
-            '''
-            #print(i)
 
-            
-#        print(cc)
-#        print('cc')
-#        print(pos_fa)
-#        print('pos_fa')
         print()
         print('..calculating fourfold-degenerate positions on contigs..')
         print()
-        '''
-        for gene in pos_fa:
-            if gene not in cc:
-                print(gene)
-        '''
+
         pos_con = [['contig', 'POS']]
 
         for gene in pos_fa:
-#            print(gene)#debug
-            #print(pos_fa[gene])
-            #exception handling: exon has no snps
+
             if gene in cc:
-#                print(cc[gene])
-#                print('line164')
+
                 for numb in pos_fa[gene]:
-                    #print(pos_fa[gene])
+
                     numb = int(numb)
                     tot = 0
+
                     for i in range(len(cc[gene])):
                         tot += int(cc[gene].iloc[i,5])
-#                        print(int(cc[gene].iloc[i,5]))
+
                         if tot >= numb:
                             diff = tot - numb
                             contig = str(cc[gene].iloc[i,0])
@@ -624,8 +501,7 @@ def main(argv):
                             contig=''
                             pos = ''
                             break
-#        print(pos_con) #debug
-#        print('pos_con', len(pos_con)) #debug
+
         del pos_fa
         
         print()
@@ -633,277 +509,197 @@ def main(argv):
         print()
 
         checklist = pd.DataFrame(pos_con[1:], columns = pos_con[0])
-#        print(checklist) #debug
-#        sys.exit()
         del pos_con
-
         ffdg_positions_on_ctgs = checklist
-#        print('ffdg_positions_on_ctgs', len(ffdg_positions_on_ctgs)) #debug
-#        print(ffdg_positions_on_ctgs)
-        return ffdg_positions_on_ctgs, cds_positions
+        data.add_df('ffdg_positions_on_ctgs', ffdg_positions_on_ctgs)
+        data.add_df('cds_positions', cds_positions)
+        data.df['ffdg_positions_on_ctgs'].loc[:,'check'] = data.df['ffdg_positions_on_ctgs'].iloc[:,0].map(str) + ',' + data.df['ffdg_positions_on_ctgs'].iloc[:,1].map(str)
+        return
 
 
 
 
+    def get_snp():
+        data.add_df('results', {})
+        #sample counter
+        cnt = 0
 
+        for i in data.settings['prefix']:
+            cnt += 1
 
-
-
-
-
-
-
-
-
-
-
-
-
-    def get_snp(transcript, gff, df_filtered_vcf, df_vcf_total, ffdg_positions_on_ctgs, cds_positions):
-        filtered_vcf = df_filtered_vcf.astype(str) #necessary?
-#        df = ffdg_positions_on_ctgs
-
-
-#        print(df) #debug
- 
-        print()
-        print('..compare snp.vcf with 4fold-degenarate candidates..')
-        print()
-       
-
-
-        ffdg = len(ffdg_positions_on_ctgs) #total 4-fold degenerate sites
-
-        if ffdg == 0:
             print()
-            print('ERROR: no 4fold-dgenerate sites could be read from fasta')
+            print('..compare snp.vcf with 4fold-degenarate candidates..')
             print()
-            print(form)
-            sys.exit()
-        '''
-        print(ffdg_positions_on_ctgs) #debug
 
-        ffdg_positions_on_ctgs['check'] = ffdg_positions_on_ctgs.contig.map(str) + ',' + ffdg_positions_on_ctgs.POS.map(str)
-        '''
-        filtered_vcf['check'] = filtered_vcf.contig.map(str) + ',' + filtered_vcf.POS.map(str)
-        df_ffdg_snps = filtered_vcf.loc[filtered_vcf['check'].isin(ffdg_positions_on_ctgs['check'])]
-        df_cds_snps = filtered_vcf.loc[filtered_vcf['check'].isin(cds_positions['check'])]
+            ffdg = len(data.df['ffdg_positions_on_ctgs']) #total 4-fold degenerate sites
 
-#        print(df_ffdg_snps) #debug
-#        print(filtered_vcf) #debug
-#        print(cds_positions) #debug        
-#        print(df_cds_snps) #debug 
-        SNP = len(df_ffdg_snps)
-        ti = len(df_ffdg_snps.loc[df_ffdg_snps.loc[:,'substitution'] == "ti"])
-        tv = len(df_ffdg_snps.loc[df_ffdg_snps.loc[:,'substitution'] == "tv"])
-        total = len(df_cds_snps)
+            if ffdg == 0:
+                print()
+                print('ERROR: no 4fold-dgenerate sites could be read from fasta')
+                print()
+                print(form)
+                sys.exit()
 
-#        print('SNP', SNP) #debug
-#        print('ti', ti) #debug
-#        print('tv', tv) #debug
-#        print('ffdg', ffdg) #debug     
-#        print('total', total) #debug   
+            #make proper df to get rid of error
+            data.df['df_filtered_vcf'][i] = data.df['df_filtered_vcf'][i].copy()
+            data.df['ffdg_positions_on_ctgs'] = data.df['ffdg_positions_on_ctgs'].copy()
+            data.df['cds_positions'] = data.df['cds_positions'].copy()
+            #slice data
+            data.df['df_filtered_vcf'][i].loc[:,'check'] = data.df['df_filtered_vcf'][i].contig.map(str).copy() + ',' + data.df['df_filtered_vcf'][i].POS.map(str).copy()
+            data.df['df_ffdg_snps'] = data.df['df_filtered_vcf'][i].loc[data.df['df_filtered_vcf'][i].loc[:,'check'].isin(data.df['ffdg_positions_on_ctgs'].loc[:,'check'])].copy()
+            data.df['df_cds_snps'] = data.df['df_filtered_vcf'][i].loc[data.df['df_filtered_vcf'][i].loc[:,'check'].isin(data.df['cds_positions'].loc[:,'check'])].copy()
 
-        #calculate years apart with 4fdg-mutation constant
-        #take in count the morigan-formula
-        #weighting transitions and transversions
+            SNP = len(data.df['df_ffdg_snps'])
+            ti = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "ti"])
+            tv = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "tv"])
+            total = len(data.df['df_cds_snps'])
 
-        #the K2P formula
-        k2p = -0.5*math.log((1-2*(ti/ffdg)-(tv/ffdg)) * ((1-2*(tv/ffdg)))**.5)
-        
-        
-        #the STD of K2p
-        #split the whole moster-formula in four parts for easier editing
-        t1 = 1/(1-2*(ti/ffdg)-(tv/ffdg))**2*(ti/ffdg)
-        t2 = (0.5 * ((1/((1-2*(ti/ffdg)-(tv/ffdg))))+(1/(1-2*(tv/ffdg)))))**2*(tv/ffdg)
-        t3 = 1/(1-2*(ti/ffdg)-(tv/ffdg))*(ti/ffdg);
-        t4 = (0.5*((1/((1-2*(ti/ffdg)-(tv/ffdg))))+(1/(1-2*(tv/ffdg)))))*(tv/ffdg)
-        
-        k2p_std = ((1/ffdg)*(t1 + t2 -(t3 + t4)**2))**.5
+            #calculate years apart with 4fdg-mutation constant
+            #take in count the morigan-formula
+            #weighting transitions and transversions
 
-        subst_rate = 1.3*(10**-8) #arabidopsis
-#        subst_rate = 0.9*(10**-9) #asco 2002 min
-#        subst_rate = 16.7*(10**-9) #asco 2002 max
-        div_time     = k2p / (2*(subst_rate))
-        
-        div_time_std = k2p_std / (2*(subst_rate))
+            #the K2P formula
+            k2p = -0.5*math.log((1-2*(ti/ffdg)-(tv/ffdg)) * ((1-2*(tv/ffdg)))**.5)
 
-        if total != 0:
-            ffdg_to_tot = SNP/total
-        else:
-            ffdg_to_tot = 'NA'
-        #make stats df:
-        stats = [   ["4fdg_sites:"   ,   ffdg],\
-                    ["4fdg_snp:"   ,   SNP],\
-#                    ["REF:"   ,   REF],\ 
-                    ["snp_ratio:"   ,   SNP/ffdg],\
-                    ["div_time"   ,   div_time],\
-                    ["time_std"   ,   abs(div_time_std)],\
-#                    ["transitions"   ,   ti],\
-#                    ["transversions"   ,   tv],\
-                    ["snp_tot:"   ,   total],\
-                    ["4fdg/tot"   ,   ffdg_to_tot]\
-                 ]
+            #the STD of K2p
+            #split the whole moster-formula in four parts for easier editing
+            t1 = 1/(1-2*(ti/ffdg)-(tv/ffdg))**2*(ti/ffdg)
+            t2 = (0.5 * ((1/((1-2*(ti/ffdg)-(tv/ffdg))))+(1/(1-2*(tv/ffdg)))))**2*(tv/ffdg)
+            t3 = 1/(1-2*(ti/ffdg)-(tv/ffdg))*(ti/ffdg);
+            t4 = (0.5*((1/((1-2*(ti/ffdg)-(tv/ffdg))))+(1/(1-2*(tv/ffdg)))))*(tv/ffdg)
+            
+            k2p_std = ((1/ffdg)*(t1 + t2 -(t3 + t4)**2))**.5
+# =============================================================================
+#             here the substitution rate is chosen!!!
+# =============================================================================
 
-        print(pd.DataFrame(stats))
+            subst_rate = 1.3*(10**-8) #arabidopsis
+    #        subst_rate = 0.9*(10**-9) #asco 2002 min
+    #        subst_rate = 16.7*(10**-9) #asco 2002 max
+            div_time     = k2p / (2*(subst_rate))
+
+            div_time_std = k2p_std / (2*(subst_rate))
+    
+            if total != 0:
+                ffdg_to_tot = SNP/total
+            else:
+                ffdg_to_tot = 'NA'
+
+            #make stats df:
+            stats = [   ["4fdg_sites:"   ,   ffdg],\
+                        ["4fdg_snp:"   ,   SNP],\
+                        ["snp_ratio:"   ,   SNP/ffdg],\
+                        ["div_time"   ,   div_time],\
+                        ["time_std"   ,   abs(div_time_std)],\
+                        ["snp_tot:"   ,   total],\
+                        ["4fdg/tot"   ,   ffdg_to_tot]\
+                     ]
+
+            print(pd.DataFrame(stats))
+            print()
+            print()
+            data.df['results'][i] = [data.df['df_ffdg_snps'], stats]
+        return
+
+
+    def printout():
+
         print()
         print()
-        #print('output: df_snp_{}'.format(vcf.replace('.vcf', '')))
-        #print('output: df_snp_{}'.format(vcf.replace('.vcf', '')))
-        #output.to_csv(path_or_buf='{}'.format('df_snp_{}'.format(vcf.replace('.vcf', ''))), sep='\t', index = False, header = False)
-        #stats.to_csv(path_or_buf='{}'.format('stats_{}.txt'.format(vcf.replace('.vcf', ''))), sep='\t', index = False, header = False)
+        print('***')
+        print('vcf:',  data.settings['vcf'])
+        print('***')
+        print()
+        print()
+
+        #make an index of samples
+        lyst = []
+        for i in data.df['df_filtered_vcf']:
+            lyst.append(i)
+    
+        #output formatting
+        table = [['']]
+        for j in range(len(data.df['results'][lyst[0]][1])):
+            table[0].append(data.df['results'][lyst[0]][1][j][0])
+        
+        for i in lyst:
+            table.append([i])
+            for j in range(len(data.df['results'][i][1])):
+                table[-1].append(data.df['results'][i][1][j][-1])
+    
+    
+        df = pd.DataFrame(table)
+        df.to_csv(path_or_buf='{}'.format('results.txt'), sep='\t', index = False, header = False)
+        if  data.settings['ffdg_pos_output'] == 1:
+             data.df['ffdg_positions_on_ctgs'].iloc[:,:2].to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
+        df = df.set_index([0])
+        df.columns = df.iloc[0]
+        df = df.reindex(df.index.drop(''))
+        del df.index.name
+        print()
+        print()
+        print()
+        print('SUMMARY 4-fold degenerate sites:')
+        print()
+        print()
+        #print whole results df
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(df)
+        print()
+        print()
+        print()
+        print()
+        print('output:\tresults.txt')
         
 
-        return df_ffdg_snps, stats
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    df_filtered_vcf = filter_vcf(vcf, variant, ref, save_filtered_vcfs, df_histo, mincov)          #, mindiff, minfrac)
-    ffdg_positions_on_ctgs, cds_positions = get_pos_ffdg_on_contigs(transcript, gff)
-    if ffdg_pos_output == 1:
-        ffdg_positions_on_ctgs.to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
-    '''
-    print('print(df_filtered_vcf)')
-    print(df_filtered_vcf)
-    '''
+        #shared snps?
+        table = [['']]
+        for x in lyst:
+            table[0].append(x)
+            table.append([x])
+        
+        for y in range(len(lyst)):
+            for x in range(len(lyst)):
+                table[y+1].append(str(len(data.df['results'][lyst[x]][0].loc[data.df['results'][lyst[x]][0]['check'] .isin( data.df['results'][lyst[y]][0]['check'])])))
     
-#    for i in df_filtered_vcf:
-#        print(i)
-#    for i in df_filtered_vcf:
-#        df_filtered_vcf[i] = df_filtered_vcf[i].iloc[:,:2]
-#    print(df_filtered_vcf)
-
-    print()
-    print()
-    print('***')
-    print('vcf:',  vcf)
-    print('***')
-    print()
-    print()
-
-    #add 'check' column for comparing while get_snp()
-#    print(ffdg_positions_on_ctgs) #debug
-    ffdg_positions_on_ctgs['check'] = ffdg_positions_on_ctgs.iloc[:,0].map(str) + ',' + ffdg_positions_on_ctgs.iloc[:,1].map(str)
-
-
-    results = {}
-    #sample counter
-    cnt = 0
-    for i in df_filtered_vcf:
-        cnt += 1
+        df = pd.DataFrame(table)
+        df.to_csv(path_or_buf='{}'.format('results_ffdg_snps_shared.txt'), sep='\t', index = False, header = False)
+        df = df.set_index([0])
+        df.columns = df.iloc[0]
+    
+        df = df.reindex(df.index.drop(''))
+        del df.index.name
         print()
-        print('calculating 4-fold snps of {}'.format(i), '\t', 'sample', cnt, 'of', len(df_filtered_vcf))
         print()
-        output, stats = get_snp(transcript, gff, df_filtered_vcf[i], df_vcf_total, ffdg_positions_on_ctgs, cds_positions)
-        results[i] = [output, stats]
-
-  
-    #make an index of samples
-    lyst = []
-    for i in df_filtered_vcf:
-        lyst.append(i)
-
-    #output formatting
-    table = [['']]
-    for j in range(len(results[lyst[0]][1])):
-        table[0].append(results[lyst[0]][1][j][0])
-    
-    for i in lyst:
-        table.append([i])
-        for j in range(len(results[i][1])):
-            table[-1].append(results[i][1][j][-1])
+        print()
+        print('SUMMARY shared 4-fold degenerate sites:')
+        print()
+        print()
+        #print whole results df
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(df)
+        print()
+        print()
+        print()
+        print()
+        print('output:\tresults_ffdg_snps_shared.txt')
+        return
 
 
-    df = pd.DataFrame(table)
-    df.to_csv(path_or_buf='{}'.format('results.txt'), sep='\t', index = False, header = False)
-    df = df.set_index([0])
-    df.columns = df.iloc[0]
-    df = df.reindex(df.index.drop(''))
-    del df.index.name
-    print()
-    print()
-    print()
-    print('SUMMARY 4-fold degenerate sites:')
-    print()
-    print()
-    #print whole results df
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        print(df)
-    print()
-    print()
-    print()
-    print()
-    print('output:\tresults.txt')
-    
-    pd.options.mode.chained_assignment = None  # default='warn' disabled
-    #same snps?
-    '''
-    for i in results:
-        results[i][0] = results[i][0][results[i][0].iloc[:,2] == 'SNP']
-        results[i][0]['check'] = results[i][0].iloc[:,0].map(str) + ',' + results[i][0].iloc[:,1].map(str)
-    '''
-    table = [['']]
-    for x in lyst:
-        table[0].append(x)
-        table.append([x])
-    
-    for y in range(len(lyst)):
-        for x in range(len(lyst)):
-            table[y+1].append(str(len(results[lyst[x]][0].loc[results[lyst[x]][0]['check'] .isin( results[lyst[y]][0]['check'])])))
 
-    df = pd.DataFrame(table)
-    df.to_csv(path_or_buf='{}'.format('results_ffdg_snps_shared.txt'), sep='\t', index = False, header = False)
-    df = df.set_index([0])
-    df.columns = df.iloc[0]
 
-    df = df.reindex(df.index.drop(''))
-    del df.index.name
-    print()
-    print()
-    print()
-    print('SUMMARY shared 4-fold degenerate sites:')
-    print()
-    print()
-    #print whole results df
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        print(df)
-    print()
-    print()
-    print()
-    print()
-    print('output:\tresults_ffdg_snps_shared.txt')
+
+# =============================================================================
+#     Execution of programs start here!!!
+# =============================================================================
+
+    filter_vcf()
+    get_pos_ffdg_on_contigs()
+    get_snp()
+    printout()
 
     sys.exit()
     
 if __name__ == "__main__":
     main(sys.argv[1:])
+
