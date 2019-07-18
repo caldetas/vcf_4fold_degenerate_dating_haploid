@@ -8,7 +8,7 @@ The mutation rate used is the mutation Rate of *A.thaliana*.
 To adapt the parsing of gene-name search "parsing" in the script.  
 Use option "-h" or "--help" for further information.  
 The "--ref" changes the refernce sample mutations (usually ~0). The option counts all the non mutated 4fdg sites, in which any other sample has a mutation, as a snp for the reference sample (gives total snp's organism).  
-The "--new_ref" option is very usefull. Set a new reference sample to get better dating-resolution in the new-ref's branch.  
+The "--new_ref" option is very useful. Set a new reference sample to get better dating-resolution in the new-ref's branch.  
 
 ## MANUAL
 
