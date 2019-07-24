@@ -28,6 +28,19 @@ class data:
     def add_setting(self, name, settings):
         self.settings[name] = settings
 
+    def check(self):
+        print()
+        print('SETTINGS:')
+        for i in self.settings:
+            print(i+', ', end='')
+        print()
+        print()
+        print('DATAFRAMES:')
+        for i in self.df:
+            print(i+', ', end='')
+        print()
+        print()
+
 #init class data
 data = data()
 
@@ -299,7 +312,7 @@ def main(argv):
     
     
             #create filtered vcf for each sample
-            data.df['df_filtered_vcf'][sample] = df#.copy()
+            data.df['df_filtered_vcf'][sample] = df.copy()
             
 
 
@@ -344,7 +357,7 @@ def main(argv):
 
 
     def get_pos_ffdg_on_contigs():
-        
+        genes_nopoints = 'yes'
         print()
         print()
         print('..reading transcript.fasta..')
@@ -360,10 +373,14 @@ def main(argv):
                 if first == 1:
                     lyst_fa[header] = seq
                     header = line.split()[0][1:] #parsing fasta header for gene name
+                    if '.' in header:
+                        genes_nopoints = 'no'
                     seq = ''
                 else:
                     first = 1
                     header = line.split()[0][1:] #parsing fasta header for gene name
+                    if '.' in header:
+                        genes_nopoints = 'no'
             else:
                 seq += line
                 
@@ -407,16 +424,16 @@ def main(argv):
 #                                 has to be the same as the gene name parsed from cds fasta
 #                                 check if sep=';' or sep=':'
 # =============================================================================
-                                
-#                                gene = line[8].split(sep=';')[0].split(sep='=')[1].split('.')[0] #gene names contain points
-#                                gene = line[8].split(sep='Parent=')[-1].split(sep='=')[1]        #gene names do onot contain points
-# =============================================================================
-#                                 if 'Target=' in line[8]:
-#                                     gene=line[8].split(sep='Target=')[1].split(sep=':')[0].split(sep=';')[0].split('.')[0]
-#                                 else:
-#                                     gene = line[8].split(sep='Parent=')[1].split(sep=':')[0].split(sep=';')[0].split('.')[0]    
-# =============================================================================
-                                gene = line[8].split(sep='Parent=')[1].split(sep=':')[0].split(sep=';')[0] #.split('.')[0] #gene names contain points??
+
+                                #gene names contain points??
+                                if genes_nopoints == 'yes':
+                                    gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0].split('.')[0] #Bgt
+#                                    print(gene)
+                                elif genes_nopoints == 'no':
+                                   gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0]                #Cladonia
+#                                   print(gene)
+
+
                                 if gene not in cc:
                                     cc[gene] = []
                                     cc[gene].append([line[0], gene, line[3], line[4], line[6], 
