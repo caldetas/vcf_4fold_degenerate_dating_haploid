@@ -256,7 +256,7 @@ def main(argv):
         df = df.reset_index(drop=True)
         for column in list(df.columns)[data.settings['sample_col']:]:
             df[column] = df[column].astype(np.float64)
-        if data.settings['ref'] == '':
+        if data.settings['ref'] != '':
              temp = df.loc[:,'{}_ref'.format(data.settings['ref'])].copy()
              df.loc[:,'{}_ref'.format(data.settings['ref'])] =  df.loc[:,'{}_var'.format(data.settings['ref'])].copy()
              df.loc[:,'{}_var'.format(data.settings['ref'])] = temp
@@ -295,12 +295,12 @@ def main(argv):
         def slyce_df(df, new_ref_ref, new_ref_var):
             
             #reference searched for var
-            df_ref                      = df.loc[(df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
+            df_var                      = df.loc[(df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
                                                              & (df.iloc[:,new_ref_ref] / df.iloc[:,new_ref_var]  <= data.settings['minfrac'])\
                                                                 ].copy()
 
             #reference searched for ref
-            df_var                      = df.loc[(df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
+            df_ref                      = df.loc[(df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
                                                              & (df.iloc[:,new_ref_var] / df.iloc[:,new_ref_ref]  <= data.settings['minfrac'])\
                                                                 ].copy()
 
@@ -346,27 +346,28 @@ def main(argv):
                         
                         
     
-                                                                     #ref  searched for                ref    
-                        df_filtered_vcf['{}_var'.format(sample)] = df_ref.loc [      (df_ref.loc[:,'{}_ref'.format(sample)] - df_ref.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
-                                                                                     & (df_ref.loc[:,'{}_var'.format(sample)] / df_ref.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
+                                                                     #ref  searched for                var
+                        df_filtered_vcf['{}_ref'.format(sample)] = df_ref.loc [      (df_ref.loc[:,'{}_var'.format(sample)] - df_ref.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_ref.loc[:,'{}_ref'.format(sample)] / df_ref.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
                                                                                         ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
     
-                                                                     #var  searched for                var    
-                        df_filtered_vcf['{}_ref'.format(sample)] = df_var.loc [      (df_var.loc[:,'{}_var'.format(sample)] - df_var.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
-                                                                                     & (df_var.loc[:,'{}_ref'.format(sample)] / df_var.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                     #var  searched for                ref    
+                        df_filtered_vcf['{}_var'.format(sample)] = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
                                                                                         ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
-                        #safe
-                        df_filtered = pd.concat([df_filtered_vcf['{}_ref'.format(sample)], df_filtered_vcf['{}_var'.format(sample)]])
-                        del df_filtered_vcf['{}_ref'.format(sample)]
+
+                        #safe    
+                        df_filtered = pd.concat([df_filtered_vcf['{}_var'.format(sample)], df_filtered_vcf['{}_ref'.format(sample)]])
                         del df_filtered_vcf['{}_var'.format(sample)]
+                        del df_filtered_vcf['{}_ref'.format(sample)]
                         df_filtered = df_filtered.sort_values(by=['contig', 'POS'], ascending=True)
                         data.df['df_filtered_vcf'][sample] = df_filtered.copy()
                         del df_filtered
 
                     else:
-                                                                #var  searched for                var
-                        data.df['df_filtered_vcf'][sample]  = df_var.loc [      (df_var.loc[:,'{}_var'.format(sample)] - df_var.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
-                                                                                     & (df_var.loc[:,'{}_ref'.format(sample)] / df_var.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                #var  searched for                ref
+                        data.df['df_filtered_vcf'][sample]  = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
                                                                                         ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
 
         #create filtered vcf for each sample
