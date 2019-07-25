@@ -92,13 +92,14 @@ def main(argv):
 
     data.add_setting('vcf', 0)
     data.add_setting('variant', '')
-    data.add_setting('ref', 'NA')
+    data.add_setting('ref', '')
     data.add_setting('df_histo', 0)
     data.add_setting('save_filtered_vcfs', 0)
     data.add_setting('mincov', 0)
     data.add_setting('new_ref', '')
     data.add_setting('ffdg_pos_output', 0)
     data.add_df('tree', [])
+    data.add_df('df_filtered_vcf', {})
 
 
 
@@ -142,7 +143,6 @@ def main(argv):
     #filtering options
     data.add_setting('mindiff', 1)
     data.add_setting('minfrac', 0.05)
-    data.add_df('df_filtered_vcf', {})
 
 
     #which column does the sample start?
@@ -256,7 +256,12 @@ def main(argv):
         df = df.reset_index(drop=True)
         for column in list(df.columns)[data.settings['sample_col']:]:
             df[column] = df[column].astype(np.float64)
+        if data.settings['ref'] == '':
+             temp = df.loc[:,'{}_ref'.format(data.settings['ref'])].copy()
+             df.loc[:,'{}_ref'.format(data.settings['ref'])] =  df.loc[:,'{}_var'.format(data.settings['ref'])].copy()
+             df.loc[:,'{}_var'.format(data.settings['ref'])] = temp
         df['POS'] = df['POS'].astype(int)
+        df= df.copy()
         data.add_df('vcf_original', df)
         data.df['vcf_original'].loc[:,'check'] = data.df['vcf_original'].contig.map(str) + ',' + data.df['vcf_original'].POS.map(str)
         #more filtering from commandline settings
@@ -273,55 +278,107 @@ def main(argv):
 #     read the vcf file and create a coverage table
 # =============================================================================
     def filter_vcf():
-        df = data.df['vcf_original']
+        df = data.df['vcf_original'].copy()
 
+        
 
-        print()
         #get position of new_ref sample in df
         for i in [i for i,x in enumerate(data.df['vcf_original'].columns) if x == '{}_ref'.format(data.settings['new_ref'])]:
             new_ref_ref = i
         for i in [i for i,x in enumerate(data.df['vcf_original'].columns) if x == '{}_var'.format(data.settings['new_ref'])]:
             new_ref_var = i 
         
+        df = df.loc[       (df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
+                        & (df.iloc[:,new_ref_ref] / df.iloc[:,new_ref_var]  <= data.settings['minfrac'])\
+                            ].copy()
 
-        #filter valid snps for data.settings['new_reference']
-        df = df.loc[(df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
-                        &  (df.iloc[:,new_ref_var] / df.iloc[:,new_ref_ref]  <= data.settings['minfrac'])\
-                            ]
-
-#        df = df.sort_values(by=['contig', 'POS'], ascending=True)
-
-        if data.settings['mincov'] != 0:
-            if len(data.settings['prefix']) != len(data.settings['mincov']):  
-                print()
-                print()
-                print('ERROR: number of mincov values does not match number of samples')
-                print()
-                print ('{}'.format(form))
-                sys.exit()
-        for sample in data.settings['prefix']:
-            #filter sample
-            df = df.loc[(df.loc[:,'{}_var'.format(sample)] - df.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
-                        &  (df.loc[:,'{}_ref'.format(sample)] / df.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
-                            ]
-            #filter mincov
-            if data.settings['mincov'] != 0:
-                for minc, sample in zip(data.settings['mincov'],data.settings['prefix']):
-                        if sample == data.settings['new_ref']:
-                            df = df.loc [df.loc[:,'{}_ref'.format(sample)]  >= minc]
-    
-    
-            #create filtered vcf for each sample
-            data.df['df_filtered_vcf'][sample] = df.copy()
+        def slyce_df(df, new_ref_ref, new_ref_var):
             
+            #reference searched for var
+            df_ref                      = df.loc[(df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
+                                                             & (df.iloc[:,new_ref_ref] / df.iloc[:,new_ref_var]  <= data.settings['minfrac'])\
+                                                                ].copy()
+
+            #reference searched for ref
+            df_var                      = df.loc[(df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
+                                                             & (df.iloc[:,new_ref_var] / df.iloc[:,new_ref_ref]  <= data.settings['minfrac'])\
+                                                                ].copy()
+
+# =============================================================================
+#             !!! ACHTUNG !!!
+# =============================================================================
+            for sample in data.settings['prefix']:
+                df_filtered_vcf = {}
+                if data.settings['new_ref'] != data.settings['ref']:
+    
+                    if sample != data.settings['new_ref']:
+                        
+                        
+    
+                                                                     #ref  searched for                var
+                        df_filtered_vcf['{}_ref'.format(sample)] = df_ref.loc [      (df_ref.loc[:,'{}_var'.format(sample)] - df_ref.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_ref.loc[:,'{}_ref'.format(sample)] / df_ref.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+    
+                                                                     #var  searched for                ref    
+                        df_filtered_vcf['{}_var'.format(sample)] = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+
+                        #safe    
+                        df_filtered = pd.concat([df_filtered_vcf['{}_var'.format(sample)], df_filtered_vcf['{}_ref'.format(sample)]])
+                        del df_filtered_vcf['{}_var'.format(sample)]
+                        del df_filtered_vcf['{}_ref'.format(sample)]
+                        df_filtered = df_filtered.sort_values(by=['contig', 'POS'], ascending=True)
+                        data.df['df_filtered_vcf'][sample] = df_filtered.copy()
+                        del df_filtered
+
+                    else:
+                                                                #var  searched for                ref
+                        data.df['df_filtered_vcf'][sample]  = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+
+
+
+                else:
+                    if sample != data.settings['new_ref']:
+                        
+                        
+    
+                                                                     #ref  searched for                ref    
+                        df_filtered_vcf['{}_var'.format(sample)] = df_ref.loc [      (df_ref.loc[:,'{}_ref'.format(sample)] - df_ref.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_ref.loc[:,'{}_var'.format(sample)] / df_ref.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+    
+                                                                     #var  searched for                var    
+                        df_filtered_vcf['{}_ref'.format(sample)] = df_var.loc [      (df_var.loc[:,'{}_var'.format(sample)] - df_var.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_ref'.format(sample)] / df_var.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+                        #safe
+                        df_filtered = pd.concat([df_filtered_vcf['{}_ref'.format(sample)], df_filtered_vcf['{}_var'.format(sample)]])
+                        del df_filtered_vcf['{}_ref'.format(sample)]
+                        del df_filtered_vcf['{}_var'.format(sample)]
+                        df_filtered = df_filtered.sort_values(by=['contig', 'POS'], ascending=True)
+                        data.df['df_filtered_vcf'][sample] = df_filtered.copy()
+                        del df_filtered
+
+                    else:
+                                                                #var  searched for                var
+                        data.df['df_filtered_vcf'][sample]  = df_var.loc [      (df_var.loc[:,'{}_var'.format(sample)] - df_var.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
+                                                                                     & (df_var.loc[:,'{}_ref'.format(sample)] / df_var.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                                        ].loc[:,['contig', 'POS', 'substitution', 'check']].copy()
+
+        #create filtered vcf for each sample
+        slyce_df(df, new_ref_ref, new_ref_var)
 
 
 
 
         if data.settings['df_histo'] == 1:
+
             df_rstudio = data.settings['vcf_original'].copy()
             for i in list(data.df['df_filtered_vcf']):
-                data.df['df_filtered_vcf'][i].loc[:,'check'] = data.df['df_filtered_vcf'][i].contig.map(str) + ',' + data.df['df_filtered_vcf'][i].POS.map(str)
                 df_rstudio.loc[~df_rstudio['check'].isin(data.df['df_filtered_vcf'][i]['check']),('{}_ref'.format(i), '{}_var'.format(i))] = np.NAN
             del df_rstudio['check']
             df_rstudio.iloc[:,5:] = df_rstudio.iloc[:,5:].astype(float)
@@ -357,11 +414,12 @@ def main(argv):
 
 
     def get_pos_ffdg_on_contigs():
-        genes_nopoints = 'yes'
+        
         print()
         print()
         print('..reading transcript.fasta..')
         print()
+        genes_contain_points = 'no'
         header = ''
         fa = open('{}'.format(data.settings['transcript']))
         seq = ''
@@ -373,14 +431,14 @@ def main(argv):
                 if first == 1:
                     lyst_fa[header] = seq
                     header = line.split()[0][1:] #parsing fasta header for gene name
-                    if '.' in header:
-                        genes_nopoints = 'no'
                     seq = ''
+                    if '.' in header:
+                        genes_contain_points = 'yes'
                 else:
                     first = 1
-                    header = line.split()[0][1:] #parsing fasta header for gene name
                     if '.' in header:
-                        genes_nopoints = 'no'
+                        genes_contain_points = 'yes'
+                    header = line.split()[0][1:] #parsing fasta header for gene name
             else:
                 seq += line
                 
@@ -426,14 +484,10 @@ def main(argv):
 # =============================================================================
 
                                 #gene names contain points??
-                                if genes_nopoints == 'yes':
+                                if genes_contain_points == 'no':
                                     gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0].split('.')[0] #Bgt
-#                                    print(gene)
-                                elif genes_nopoints == 'no':
+                                elif genes_contain_points == 'yes':
                                    gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0]                #Cladonia
-#                                   print(gene)
-
-
                                 if gene not in cc:
                                     cc[gene] = []
                                     cc[gene].append([line[0], gene, line[3], line[4], line[6], 
@@ -506,8 +560,6 @@ def main(argv):
         data.add_df('cds_positions', cds_positions)
         data.df['ffdg_positions_on_ctgs'].loc[:,'check'] = data.df['ffdg_positions_on_ctgs'].iloc[:,0].map(str) + ',' + data.df['ffdg_positions_on_ctgs'].iloc[:,1].map(str)
         data.df['cds_positions'].loc[:,'check'] = data.df['cds_positions'].iloc[:,0].map(str) + ',' + data.df['cds_positions'].iloc[:,1].map(str)
-        data.df['ffdg_positions_on_ctgs'] = data.df['ffdg_positions_on_ctgs'].copy()
-        data.df['cds_positions'] = data.df['cds_positions'].copy()
         return
 
 
@@ -526,7 +578,6 @@ def main(argv):
             print()
 
             ffdg = len(data.df['ffdg_positions_on_ctgs']) #total 4-fold degenerate sites
-
             if ffdg == 0:
                 print()
                 print('ERROR: no 4fold-dgenerate sites could be read from fasta')
@@ -534,20 +585,19 @@ def main(argv):
                 print(form)
                 sys.exit()
 
-# =============================================================================
-#             #make proper df to get rid of error
-#             data.df['df_filtered_vcf'][i] = data.df['df_filtered_vcf'][i].copy()
-# =============================================================================
-
+            #make proper df to get rid of error
+#            data.df['df_filtered_vcf'][i] = data.df['df_filtered_vcf'][i].copy()
+#            data.df['ffdg_positions_on_ctgs'] = data.df['ffdg_positions_on_ctgs'].copy()
+#            data.df['cds_positions'] = data.df['cds_positions'].copy()
             #slice data
-            data.df['df_filtered_vcf'][i].loc[:,'check'] = data.df['df_filtered_vcf'][i].contig.map(str).copy() + ',' + data.df['df_filtered_vcf'][i].POS.map(str).copy()
+#            data.df['df_filtered_vcf'][i].loc[:,'check'] = data.df['df_filtered_vcf'][i].contig.map(str).copy() + ',' + data.df['df_filtered_vcf'][i].POS.map(str).copy()
             data.df['df_ffdg_snps'] = data.df['df_filtered_vcf'][i].loc[data.df['df_filtered_vcf'][i].loc[:,'check'].isin(data.df['ffdg_positions_on_ctgs'].loc[:,'check'])].copy()
             data.df['df_cds_snps'] = data.df['df_filtered_vcf'][i].loc[data.df['df_filtered_vcf'][i].loc[:,'check'].isin(data.df['cds_positions'].loc[:,'check'])].copy()
 
             SNP = len(data.df['df_ffdg_snps'])
             ti = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "ti"])
             tv = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "tv"])
-            total = len(data.df['df_cds_snps'])
+            total = len(data.df['cds_positions'])
 
             #calculate years apart with 4fdg-mutation constant
             #take in count the morigan-formula
@@ -625,13 +675,13 @@ def main(argv):
     
     
         df = pd.DataFrame(table)
-#        df.to_csv(path_or_buf='{}'.format('results.txt'), sep='\t', index = False, header = False)
+        df.to_csv(path_or_buf='{}'.format('results.txt'), sep='\t', index = False, header = False)
         df = df.reindex()
         temp = df.iloc[0,0]
         df = df.set_index(df.iloc[:,0])
         df.columns = df.iloc[0,:]
         df = df.reindex(df.index.drop(temp))
-
+#        print(df)
         del df[temp]
         del df.index.name
         #store divergence dataframe in dictionary
@@ -640,10 +690,24 @@ def main(argv):
         print(df)
 
         
-        
         if  data.settings['ffdg_pos_output'] == 1:
              data.df['ffdg_positions_on_ctgs'].iloc[:,:2].to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
 
+        print()
+        print()
+        print()
+        print('SUMMARY 4-fold degenerate sites:')
+        print()
+        print()
+        #print whole results df
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            print(df)
+        print()
+        print()
+        print()
+        print()
+        print('output:\tdiv_t_<sample>.txt')
+        
 
 
 
@@ -662,16 +726,16 @@ def main(argv):
     data.add_setting('cnt', 0)
     #dictionary for divergence dataframes
     data.add_df('div_dic', {})
+
     #filter tree for, rooting every sample once
     for sample in data.settings['prefix']:
         data.settings['new_ref'] = sample
         data.settings['cnt'] += 1
-
         filter_vcf()
         get_snp()
         printout()
     for sample in data.settings['prefix']:
-        data.df['div_dic'][sample].to_csv('div_t_{}'.format(sample), sep='\t')
+        data.df['div_dic'][sample].to_csv('div_t_{}'.format(sample))
 
 
     sys.exit()
