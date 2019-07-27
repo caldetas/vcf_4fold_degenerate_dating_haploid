@@ -680,6 +680,33 @@ def main(argv):
         return
 
 
+    def output():
+        for sample in data.settings['prefix']:
+            if data.settings['div_t_df'] == 1:
+                data.df['div_dic'][sample].to_csv('div_t_{}'.format(sample), sep = '\t')
+    
+        table = [['']]
+        table[0].extend(data.settings['prefix'])
+        for i_y, y in enumerate(data.settings['prefix']):
+            table.append([y])
+    
+            for i_x, x in enumerate(data.settings['prefix']):
+                table[-1].append(data.df['div_dic'][y].loc[x,'div_time'])
+        print('\nresults:\n')
+        table = pd.DataFrame(table[1:], columns = table[0])
+        print(table)
+        table.to_csv('results_divergence_time.txt'.format(sample), sep = '\t', index = False)
+    
+    
+        print('\nOUTPUT:\nresults_divergence_time.txt\n')
+    
+    
+        if data.settings['ref'] == '':
+            for i in range(len(table)):
+                if (table.iloc[i, 1:] == 0).all():
+                    print('\nreference sample candidate:\t', table.iloc[i,0])
+                    print()
+        return
 
 
 
@@ -700,34 +727,10 @@ def main(argv):
         filter_vcf()
         get_snp()
         printout()
-    for sample in data.settings['prefix']:
-        if data.settings['div_t_df'] == 1:
-            data.df['div_dic'][sample].to_csv('div_t_{}'.format(sample), sep = '\t')
-
-    table = [['']]
-    table[0].extend(data.settings['prefix'])
-    print(table)
-    for i_y, y in enumerate(data.settings['prefix']):
-        print(y) #debug
-        print(data.df['div_dic'][y])
-        table.append([y])
-
-        for i_x, x in enumerate(data.settings['prefix']):
-            table[-1].append(data.df['div_dic'][y].loc[x,'div_time'])
-    print('\nresults:\n')
-    table = pd.DataFrame(table[1:], columns = table[0])
-    print(table)
-    table.to_csv('results_divergence_time.txt'.format(sample), sep = '\t', index = False)
-
-
-    print('\nOUTPUT:\nresults_divergence_time.txt\n')
-
-
-    if data.settings['ref'] == '':
-        for i in range(len(table)):
-            if (table.iloc[i, 1:] == 0).all():
-                print('\nreference sample candidate:\t', table.iloc[i,0])
-                print()
+    
+    #final output
+    output()
+        
 
 
     sys.exit()
