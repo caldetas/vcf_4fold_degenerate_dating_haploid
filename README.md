@@ -7,7 +7,7 @@ The mutation rate used is the mutation Rate of *A.thaliana*.
   
 To adapt the parsing of gene-name search "parsing" in the script.  
 Use option "-h" or "--help" for further information.  
-The "--ref" specifies the reference sample. The option helps to not get a row of zeros at the ref sample.  
+The "--ref" specifies the reference sample. The option avoids having a row of zeros for the ref sample.  
 
 
 ## MANUAL
