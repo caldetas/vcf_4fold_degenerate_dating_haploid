@@ -28,6 +28,18 @@ class data:
     def add_setting(self, name, settings):
         self.settings[name] = settings
 
+    def check(self):
+        print()
+        print('SETTINGS:')
+        for i in self.settings:
+            print(i+', ', end='')
+        print()
+        print()
+        print('DATAFRAMES:')
+        for i in self.df:
+            print(i+', ', end='')
+        print()
+        print()
 
 #init class data
 data = data()
@@ -40,7 +52,7 @@ def pd_print(df):
     df = df.set_index(df.iloc[:,0])
 #    df.columns = df.iloc[0,:]
     df = df.reindex(df.index.drop(temp))
-#    del df[temp]
+    del df[df.columns[0]]
     del df.index.name
     print(df)
 
