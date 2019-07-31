@@ -1,0 +1,5 @@
+##fileformat=VCFv4.2
+##fileDate=20190423
+##source=freeBayes v1.2.0-4-gd15209e
+##reference=D_FR.fasta
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	GR	CH	FR	IS

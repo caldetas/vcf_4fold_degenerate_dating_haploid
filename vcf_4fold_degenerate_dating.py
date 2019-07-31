@@ -28,18 +28,6 @@ class data:
     def add_setting(self, name, settings):
         self.settings[name] = settings
 
-    def check(self):
-        print()
-        print('SETTINGS:')
-        for i in self.settings:
-            print(i+', ', end='')
-        print()
-        print()
-        print('DATAFRAMES:')
-        for i in self.df:
-            print(i+', ', end='')
-        print()
-        print()
 
 #init class data
 data = data()
@@ -50,9 +38,9 @@ def pd_print(df):
     df = df.reindex()
     temp = df.iloc[0,0]
     df = df.set_index(df.iloc[:,0])
-    df.columns = df.iloc[0,:]
+#    df.columns = df.iloc[0,:]
     df = df.reindex(df.index.drop(temp))
-    del df[temp]
+#    del df[temp]
     del df.index.name
     print(df)
 
@@ -76,7 +64,7 @@ def main(argv):
             \n\t--gff <maker.gff>\
             \n\t--vcf <vcf_file>\
             \n\t\
-            \n\t*search for filtering (default: diff >=200 & ratio <=0.05)*\
+            \n\t*search for filtering (default: mindiff >=1 & ratio <=0.05)*\
             \n\t*pre-filter vcf with vcftools recommended*\
             \n\t*the filtering for the reference sample is inverted,\
             \n\t filtering for ref mapping and valid snp in any other sample*\
@@ -95,22 +83,26 @@ def main(argv):
 
     data.add_setting('vcf', 0)
     data.add_setting('variant', 'single')
-    data.add_setting('ref', '')
     data.add_setting('df_histo', 0)
     data.add_setting('save_filtered_vcfs', 0)
     data.add_setting('mincov', 0)
     data.add_setting('new_ref', '')
     data.add_setting('ffdg_pos_output', 0)
     data.add_setting('div_t_df', 0)
+    data.add_setting('cnt', 0)
     data.add_df('tree', [])
+    #temporary df for filtered vcf's
     data.add_df('df_filtered_vcf', {})
+    #dictionary for divergence time dataframes
+    data.add_df('div_dic', {})
+    
     
 
 
 
 
     try:
-       opts, args = getopt.getopt(argv,"h",['mincov=', 'transcript=', 'gff=', 'vcf=', 'ref=', 'vcf=', 'ffdg_pos_output', 'print_histo_df', 'save_filtered_vcfs', 'single', 'multi', 'all', 'div_time_df'])
+       opts, args = getopt.getopt(argv,"h",['mincov=', 'transcript=', 'gff=', 'vcf=', 'ffdg_pos_output', 'print_histo_df', 'save_filtered_vcfs', 'single', 'multi', 'all', 'div_time_df'])
     except getopt.GetoptError:
        print ('{}'.format(form))
        sys.exit()
@@ -139,8 +131,6 @@ def main(argv):
            data.add_setting('print_histo_df', 1)  
        elif opt == '--save_filtered_vcfs':
            data.add_setting('save_filtered_vcfs', 1) 
-       elif opt == '--ref':
-           data.add_setting('ref', arg)
        elif opt == '--ffdg_pos_output':
            data.add_setting('ffdg_pos_output', 1)
        elif opt == '--div_time_df':
@@ -274,6 +264,12 @@ def main(argv):
             data.df['vcf_original'] = data.df['vcf_original'].loc[data.df['vcf_original'].loc[:,'multi_var']== 'yes']
         #store sample index
         data.add_setting('prefix', prefix)
+        if data.settings['mincov'] != 0:
+            if len(data.settings['mincov']) != len(data.settings['prefix']):
+                print()
+                print('ERROR: number of mincov values not equal with number of samples')
+                print()
+                sys.exit()
         return
 
 
@@ -281,66 +277,56 @@ def main(argv):
 #     read the vcf file and create a coverage table
 # =============================================================================
     def filter_vcf():
-        df = data.df['vcf_original']
-
-        
-
-        #get position of new_ref sample in df
-        for i in [i for i,x in enumerate(data.df['vcf_original'].columns) if x == '{}_ref'.format(data.settings['new_ref'])]:
-            new_ref_ref = i
-        for i in [i for i,x in enumerate(data.df['vcf_original'].columns) if x == '{}_var'.format(data.settings['new_ref'])]:
-            new_ref_var = i 
-#        print('new_ref:', df.columns.tolist()[new_ref_ref]) #debug
-#        print('new_var:', df.columns.tolist()[new_ref_var])
-
-        if data.settings['new_ref'] != data.settings['ref']:
-            df = df.loc[       (df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
-                            & (df.iloc[:,new_ref_ref] / df.iloc[:,new_ref_var]  <= data.settings['minfrac'])\
-                                ]
-        else:
-            df = df.loc[       (df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
-                            & (df.iloc[:,new_ref_var] / df.iloc[:,new_ref_ref]  <= data.settings['minfrac'])\
-                                ].copy()
+        df = data.df['vcf_original'].copy()
 
 
-        def slyce_df(df, new_ref_ref, new_ref_var):
             
-            #reference searched for var
-            df_var                      = df.loc[(df.iloc[:,new_ref_var] - df.iloc[:,new_ref_ref]  >= data.settings['mindiff'])\
-                                                             & (df.iloc[:,new_ref_ref] / df.iloc[:,new_ref_var]  <= data.settings['minfrac'])\
-                                                                ]
+        #reference searched for var
+        df_var                      = df.loc[   (df.loc[:,'{}_var'.format(data.settings['new_ref'])] - df.loc[:,'{}_ref'.format(data.settings['new_ref'])]  >= data.settings['mindiff'])\
+                                              & (df.loc[:,'{}_ref'.format(data.settings['new_ref'])] / df.loc[:,'{}_var'.format(data.settings['new_ref'])]  <= data.settings['minfrac'])\
+                                                                            ]
+        #reference searched for ref
+        df_ref                      = df.loc[  (df.loc[:,'{}_ref'.format(data.settings['new_ref'])] - df.loc[:,'{}_var'.format(data.settings['new_ref'])]  >= data.settings['mindiff'])\
+                                             & (df.loc[:,'{}_var'.format(data.settings['new_ref'])] / df.loc[:,'{}_ref'.format(data.settings['new_ref'])]  <= data.settings['minfrac'])\
+                                                                            ]
 
-            #reference searched for ref
-            df_ref                      = df.loc[(df.iloc[:,new_ref_ref] - df.iloc[:,new_ref_var]  >= data.settings['mindiff'])\
-                                                             & (df.iloc[:,new_ref_var] / df.iloc[:,new_ref_ref]  <= data.settings['minfrac'])\
-                                                                ]
+        if data.settings['mincov'] != 0:
+            df_var = df_var.loc[df_var.loc[:,'{}_var'.format(data.settings['new_ref'])] >= data.settings['mincov'][data.settings['cnt']-1]]
+            df_ref = df_ref.loc[df.loc[:,'{}_ref'.format(data.settings['new_ref'])] >= data.settings['mincov'][data.settings['cnt']-1]]
 # =============================================================================
 #             !!! ACHTUNG !!!
 # =============================================================================
-            for sample in data.settings['prefix']:
+        
+        for i, sample in enumerate(data.settings['prefix']):
 
-                                                             #ref  compared with               vars
-                df_filtered_vcf_ref = df_ref.loc [      (df_ref.loc[:,'{}_var'.format(sample)] - df_ref.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
-                                                                             & (df_ref.loc[:,'{}_ref'.format(sample)] / df_ref.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
-                                                                                ].loc[:,['contig', 'POS', 'substitution', 'check']]
+                                                         #ref  compared with               vars
+            df_filtered_vcf_ref = df_ref.loc [      (df_ref.loc[:,'{}_var'.format(sample)] - df_ref.loc[:,'{}_ref'.format(sample)]  >= data.settings['mindiff'])\
+                                                                         & (df_ref.loc[:,'{}_ref'.format(sample)] / df_ref.loc[:,'{}_var'.format(sample)]  <= data.settings['minfrac'])\
+                                                                            ]
 
-                                                             #var  compared with               refs  
-                df_filtered_vcf_var = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
-                                                                             & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
-                                                                                ].loc[:,['contig', 'POS', 'substitution', 'check']]
+                                                         #var  compared with               refs  
+            df_filtered_vcf_var = df_var.loc [      (df_var.loc[:,'{}_ref'.format(sample)] - df_var.loc[:,'{}_var'.format(sample)]  >= data.settings['mindiff'])\
+                                                                         & (df_var.loc[:,'{}_var'.format(sample)] / df_var.loc[:,'{}_ref'.format(sample)]  <= data.settings['minfrac'])\
+                                                                            ]
+
+            #more mincov filtering
+            if data.settings['mincov'] != 0:
+                df_filtered_vcf_ref = df_filtered_vcf_ref.loc[df_filtered_vcf_ref.loc[:,'{}_var'.format(sample)] >= data.settings['mincov'][i]]
+                df_filtered_vcf_var = df_filtered_vcf_var.loc[df_filtered_vcf_var.loc[:,'{}_ref'.format(sample)] >= data.settings['mincov'][i]]
+
+            #reduce to sliced df for storage
+            df_filtered_vcf_ref = df_filtered_vcf_ref.loc[:,['contig', 'POS', 'substitution', 'check']]
+            df_filtered_vcf_var = df_filtered_vcf_var.loc[:,['contig', 'POS', 'substitution', 'check']]
+
+            #safe    
+            df_filtered = pd.concat([df_filtered_vcf_ref, df_filtered_vcf_var])
+            del df_filtered_vcf_ref
+            del df_filtered_vcf_var
+            df_filtered = df_filtered.sort_values(by=['contig', 'POS'], ascending=True)
+            data.df['df_filtered_vcf'][sample] = df_filtered
+            del df_filtered
 
 
-                #safe    
-                df_filtered = pd.concat([df_filtered_vcf_ref, df_filtered_vcf_var])
-                del df_filtered_vcf_ref
-                del df_filtered_vcf_var
-                df_filtered = df_filtered.sort_values(by=['contig', 'POS'], ascending=True)
-                data.df['df_filtered_vcf'][sample] = df_filtered
-                del df_filtered
-
-
-        #create filtered vcf for each sample
-        slyce_df(df, new_ref_ref, new_ref_var)
 
 
 
@@ -562,7 +548,7 @@ def main(argv):
             SNP = len(data.df['df_ffdg_snps'])
             ti = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "ti"])
             tv = len(data.df['df_ffdg_snps'].loc[data.df['df_ffdg_snps'].loc[:,'substitution'] == "tv"])
-            total = len(data.df['df_filtered_vcf'])
+            total = len(data.df['df_filtered_vcf'][i])
 
             #calculate years apart with 4fdg-mutation constant
             #take in count the morigan-formula
@@ -685,6 +671,8 @@ def main(argv):
             if data.settings['div_t_df'] == 1:
                 data.df['div_dic'][sample].to_csv('div_t_{}'.format(sample), sep = '\t')
     
+
+
         table = [['']]
         table[0].extend(data.settings['prefix'])
         for i_y, y in enumerate(data.settings['prefix']):
@@ -692,20 +680,18 @@ def main(argv):
     
             for i_x, x in enumerate(data.settings['prefix']):
                 table[-1].append(data.df['div_dic'][y].loc[x,'div_time'])
-        print('\nresults:\n')
         table = pd.DataFrame(table[1:], columns = table[0])
-        print(table)
+        ref_candidate = []
+
+        print('\nresults:\n')
+
+        pd_print(table)
         table.to_csv('results_divergence_time.txt'.format(sample), sep = '\t', index = False)
     
     
         print('\nOUTPUT:\nresults_divergence_time.txt\n')
-    
-    
-        if data.settings['ref'] == '':
-            for i in range(len(table)):
-                if (table.iloc[i, 1:] == 0).all():
-                    print('\nreference sample candidate:\t', table.iloc[i,0])
-                    print()
+
+
         return
 
 
@@ -716,9 +702,6 @@ def main(argv):
 
     read_vcf_to_memory()
     get_pos_ffdg_on_contigs()
-    data.add_setting('cnt', 0)
-    #dictionary for divergence dataframes
-    data.add_df('div_dic', {})
 
     #filter tree for, rooting every sample once
     for sample in data.settings['prefix']:
