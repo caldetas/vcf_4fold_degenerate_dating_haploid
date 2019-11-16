@@ -23,11 +23,9 @@ class data:
             self.df = {}
             self.settings = {}
 
-    def add_df(self, tipe, df):
-        self.df[tipe] = df
+#init class data
+data = data()
 
-    def add_setting(self, name, settings):
-        self.settings[name] = settings
 
 #instructions
 form='\nvcf_4fold_degenerate_dating.py\
@@ -54,8 +52,6 @@ form='\nvcf_4fold_degenerate_dating.py\
         \ninstall packages with anaconda\
         \n\t'
 
-#init class data
-data = data()
 
 def prepare_multiprocess():
     
@@ -71,6 +67,7 @@ def prepare_multiprocess():
         cnt+=1
     data.settings['job_nr'] = list(range(len(data.settings['prefix'])))
     return
+
 
 def pd_print(df):
 
@@ -483,7 +480,7 @@ def read_vcf_to_memory():
         df[column] = df[column].astype(np.float64)
     df['POS'] = df['POS'].astype(int)
     df= df.copy()
-    data.add_df('vcf_original', df)
+    data.df['vcf_original'] = df
     data.df['vcf_original'].loc[:,'check'] = data.df['vcf_original'].contig.map(str) + ',' + data.df['vcf_original'].POS.map(str)
     #more filtering from commandline settings
     if data.settings['variant'] == 'single':
@@ -491,7 +488,7 @@ def read_vcf_to_memory():
     if data.settings['variant'] == 'multi':
         data.df['vcf_original'] = data.df['vcf_original'].loc[data.df['vcf_original'].loc[:,'multi_var']== 'yes']
     #store sample index
-    data.add_setting('prefix', prefix)
+    data.settings['prefix'] = prefix
     if data.settings['mincov'] != 0:
         if len(data.settings['mincov']) == 1:
             data.settings['mincov'] = len(data.settings['prefix'])*data.settings['mincov']
@@ -649,8 +646,8 @@ def get_pos_ffdg_on_contigs():
 
     ffdg_positions_on_ctgs = pd.DataFrame(pos_con[1:], columns = pos_con[0])
     del pos_con
-    data.add_df('ffdg_positions_on_ctgs', ffdg_positions_on_ctgs)
-    data.add_df('cds_positions', cds_positions)
+    data.df['ffdg_positions_on_ctgs'] = ffdg_positions_on_ctgs
+    data.df['cds_positions'] = cds_positions
     
     #store ffdgs positon in csv
     if  data.settings['ffdg_pos_output'] == 1:
@@ -666,22 +663,25 @@ def get_pos_ffdg_on_contigs():
 
 if __name__ == "__main__": 
 
-
-    data.add_setting('vcf', 0)
-    data.add_setting('variant', 'single')
-    data.add_setting('df_histo', 0)
-    data.add_setting('save_filtered_vcfs', 0)
-    data.add_setting('mincov', 0)
-    data.add_setting('ffdg_pos_output', 0)
-    data.add_setting('cnt', 0)
-    data.add_setting('ref', [])
+    #define variables in class
+    data.settings['vcf'] = 0
+    data.settings['variant'] = 'single'
+    data.settings['save_filtered_vcfs'] = 0
+    data.settings['mincov'] = 0
+    data.settings['ffdg_pos_output'] = 0
     data.settings['cores'] = int(cpu_count()-1)
-    data.add_df('tree', [])
+    data.settings['ref'] = [] #list with possible reference candidates
     data.df['results'] = {}
-    #temporary df for filtered vcf's
-    data.add_df('df_filtered_vcf', {})
-    #dictionary for divergence time dataframes
-    data.add_df('div_dic', {})
+    data.df['df_filtered_vcf'] = {}
+    data.df['div_dic'] = {}
+
+    #filtering options
+    data.settings['mindiff'] = 1
+    data.settings['minfrac'] = 0.05
+
+
+    #which column does the sample start in temp cov df?
+    data.settings['sample_col'] = 4
 
     try:
        opts, args = getopt.getopt(sys.argv[1:],"h",['cores=', 'mincov=', 'transcript=', 'gff=', 'vcf=', 'ffdg_pos_output',  'save_filtered_vcfs', 'single', 'multi', 'all'])
@@ -693,28 +693,28 @@ if __name__ == "__main__":
           print ('{}'.format(form))
           sys.exit()
        elif opt == '--transcript':
-          data.add_setting('transcript', arg)
+          data.settings['transcript'] = arg
        elif opt == '--gff':
-          data.add_setting('gff', arg)
+          data.settings['gff'] = arg
        elif opt == '--vcf':
-           data.add_setting('vcf', arg)
+           data.settings['vcf'] = arg
        elif opt == '--single':
-          data.add_setting('variant', 'single')
+          data.settings['variant'] = 'single'
        elif opt == '--all':
-          data.add_setting('variant', '')
+          data.settings['variant'] = ''
        elif opt == '--multi':
-          data.add_setting('variant', 'multi')
+          data.settings['variant'] = 'multi'
        elif opt == '--mincov':
            mincov = arg.split(sep=',')
            for i in range(len(mincov)):
                mincov[i] = int(mincov[i])
-               data.add_setting('mincov', mincov)
+               data.settings['mincov'] = mincov
        elif opt == '--print_histo_df':
-           data.add_setting('print_histo_df', 1)  
+           data.settings['print_histo_df'] = 1  
        elif opt == '--save_filtered_vcfs':
-           data.add_setting('save_filtered_vcfs', 1) 
+           data.settings['save_filtered_vcfs'] = 1 
        elif opt == '--ffdg_pos_output':
-           data.add_setting('ffdg_pos_output', 1)
+           data.settings['ffdg_pos_output'] = 1
        elif opt == '--div_time_df':
            data.settings['div_t_df'] = 1
        elif opt == '--cores':
@@ -724,13 +724,7 @@ if __name__ == "__main__":
           sys.exit()
 
 
-    #filtering options
-    data.add_setting('mindiff', 1)
-    data.add_setting('minfrac', 0.05)
 
-
-    #which column does the sample start?
-    data.add_setting('sample_col', 4)
 
 
 
