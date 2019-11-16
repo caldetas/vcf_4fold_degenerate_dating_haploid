@@ -37,11 +37,11 @@ form='\nvcf_4fold_degenerate_dating.py\
         \n\t--vcf <vcf_file>\
         \n\t\
         \n\t--cores <int> *specify nr of threads, default=cpu_count-1*\
-        \n\t--mincov <minimum_coverages> *opt,comma separated integers in order of sample appearance in vcf*\
+        \n\t--mincov <int> *opt, one integer, multiple can be given for each sample comma separated in sample order of vcf columns*\
         \n\t--single *opt, consider only single variants(default!)*\
         \n\t--multi *opt, consider only multi variants*\
         \n\t--all *opt, consider single and multi variants*\
-        \n\t--save_filtered_vcfs *opt,safe filtered lowcut vcf\'s for each sample*\
+        \n\t--save_filtered_vcfs *opt,safe vcf with valid ffdg snp\'s for each sample pair*\
         \n\t--ffdg_pos_output *opt,safe ffdg positions on contigs*\
         \n\t\
         \n\t*search for filtering (default: mindiff >=1 & ratio <=0.05)*\
@@ -74,22 +74,23 @@ def prepare_multiprocess():
 
 def pd_print(df):
 
-    """Small function for printing pandas dataframes
+    """Small function for printing pandas dataframe with header
     """
 
-    df = df.reindex()
-    temp = df.iloc[0,0]
-    df = df.set_index(df.iloc[:,0])
-    df = df.reindex(df.index.drop(temp))
-    del df[df.columns[0]]
-    del df.index.name
-    print(df)
+    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+        df = df.reindex()
+        df = df.set_index(df.iloc[:,0])
+        df = df.reindex()
+        del df[df.columns[0]]
+        del df.index.name
+        print(df)
     return
 
 
 def filter_vcf(cnt):
     
-    """function for reading the vcf file and creating a coverage table
+    """function for reading the vcf file, setting a sample as reference
+       and filtering for snps in all other samples
     """
 
     df_filtered_dic = {}
@@ -147,11 +148,12 @@ def filter_vcf(cnt):
         df_filtered_dic[sample] = df_filtered
 
 
-    if data.settings['save_filtered_vcfs'] == 1:
-        for i in range(len(data.settings['prefix'])):
+        #print filtered vcf's
+        if data.settings['save_filtered_vcfs'] == 1:
+
             contig = ''
             vcf = open('{}'.format(data.settings['vcf']))
-            out = open('filtered_vcf_ref_{}_filtered_for_{}_only_ffdgs.vcf'.format(sample_new_ref, data.settings['prefix'][i]), 'w')
+            out = open('vcf_only_valid_ffdg_snps_{}_and_{}.vcf'.format(sample_new_ref, data.settings['prefix'][i]), 'w')
             for line in vcf:
                 line = line.strip('\n')
                 #print commented lines
@@ -161,8 +163,7 @@ def filter_vcf(cnt):
                     #set df of chr
                     if int(line.split()[0]) != contig:
                         contig = int(line.split()[0])
-                        df_temp = data.df['df_filtered_vcf'][data.settings['prefix'][i]].loc[   data.df['df_filtered_vcf'][data.settings['prefix'][i]].loc[:,'contig'] == str(contig)].loc[:,('contig','POS')]
-                        df_temp = list(df_temp.loc[:,'POS'])
+                        df_temp = df_filtered_dic[data.settings['prefix'][i]].loc[   df_filtered_dic[data.settings['prefix'][i]].loc[:,'contig'] == str(contig)].loc[:,'POS'].values.tolist()
                    #print snp if in df
                     if int(line.split()[1]) in df_temp:
                         print(line,file=out)
@@ -305,9 +306,6 @@ def printout(cnt):
 
     print(df)
 
-
-    if  data.settings['ffdg_pos_output'] == 1:
-         data.df['ffdg_positions_on_ctgs'].iloc[:,:2].to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
 
     print()
     print()
@@ -495,7 +493,9 @@ def read_vcf_to_memory():
     #store sample index
     data.add_setting('prefix', prefix)
     if data.settings['mincov'] != 0:
-        if len(data.settings['mincov']) != len(data.settings['prefix']):
+        if len(data.settings['mincov']) == 1:
+            data.settings['mincov'] = len(data.settings['prefix'])*data.settings['mincov']
+        elif len(data.settings['mincov']) != len(data.settings['prefix']):
             print()
             print('ERROR: number of mincov values not equal with number of samples')
             print()
@@ -651,8 +651,12 @@ def get_pos_ffdg_on_contigs():
     del pos_con
     data.add_df('ffdg_positions_on_ctgs', ffdg_positions_on_ctgs)
     data.add_df('cds_positions', cds_positions)
+    
+    #store ffdgs positon in csv
+    if  data.settings['ffdg_pos_output'] == 1:
+         data.df['ffdg_positions_on_ctgs'].iloc[:,:2].to_csv('ffdg_positions_on_ctgs', sep='\t', index=False)
     data.df['ffdg_positions_on_ctgs'].loc[:,'check'] = data.df['ffdg_positions_on_ctgs'].iloc[:,0].map(str) + ',' + data.df['ffdg_positions_on_ctgs'].iloc[:,1].map(str)
-    data.df['cds_positions'].loc[:,'check'] = data.df['cds_positions'].iloc[:,0].map(str) + ',' + data.df['cds_positions'].iloc[:,1].map(str)
+#    data.df['cds_positions'].loc[:,'check'] = data.df['cds_positions'].iloc[:,0].map(str) + ',' + data.df['cds_positions'].iloc[:,1].map(str)
     return
 
 
@@ -735,15 +739,17 @@ if __name__ == "__main__":
 #     Execution of programs start here!!!
 # =============================================================================
 
+
     read_vcf_to_memory()
     get_pos_ffdg_on_contigs()
 
-    if data.settings['cores'] > len(data.settings['prefix']):
-        data.settings['cores'] = len(data.settings['prefix'])
-    p = Pool(data.settings['cores']) #number of processes
-    prepare_multiprocess() #prepare list with jobs
+
+    #prepare list with jobs
+    prepare_multiprocess()
+
 
     #execute multi-threading
+    p = Pool(data.settings['cores']) #number of processes
     filtered_vcf = p.map(filter_vcf, data.settings['job_nr']) 
 
     #store df to class
@@ -752,36 +758,26 @@ if __name__ == "__main__":
         if len(filtered_vcf[x][1]) > 0:
             data.settings['ref'].extend(filtered_vcf[x][1])
     data.settings['ref'] = set( data.settings['ref'])
-    print(data.df['df_filtered_vcf'])
-    print(data.settings['ref'])
-    for i in data.df['df_filtered_vcf']:
-        print(i)
+
+
     #execute multi-threading
-    print('data job_nr:\n')
-    print(data.settings['job_nr'])
     p = Pool(data.settings['cores'])
     snp = p.map(get_snp, data.settings['job_nr']) #execute multi-threading
 
     #store df to class
     for x,sample in enumerate(data.settings['prefix']):
         data.df['results'][sample] = snp[x]
-    
-    for i in data.df['results']:
-        for j in data.df['results'][i]:
-            print(i, j)
-    
+
+
     #execute multi-threading
     p = Pool(data.settings['cores'])
     printed = p.map(printout, data.settings['job_nr']) #execute multi-threading
 
     #store df to class
     for x,sample in enumerate(data.settings['prefix']):
-        print('samp:', sample)
-        print('x:', x)
-        print()
         data.df['div_dic'][sample] = printed[x]
-    print('div_dic:')
-    print(data.df['div_dic'])
+
+
     #final output
     output()
 

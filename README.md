@@ -20,11 +20,11 @@ Use option "-h" or "--help" for further information.
 		--vcf <vcf_file>        
 			
 		--cores <int> *specify nr of threads, default=cpu_count-1*        
-		--mincov <minimum_coverages> *opt,comma separated integers in order of sample appearance in vcf*        
+		--mincov <int> *opt, one integer, multiple can be given for each sample comma separated in sample order of vcf columns* 
 		--single *opt, consider only single variants(default!)*        
 		--multi *opt, consider only multi variants*        
 		--all *opt, consider single and multi variants*        
-		--save_filtered_vcfs *opt,safe filtered lowcut vcf's for each sample*        
+		--save_filtered_vcfs *opt,safe vcf with valid ffdg snp's for each sample pair*
 		--ffdg_pos_output *opt,safe ffdg positions on contigs*        
 			
 		*search for filtering (default: mindiff >=1 & ratio <=0.05)*        
