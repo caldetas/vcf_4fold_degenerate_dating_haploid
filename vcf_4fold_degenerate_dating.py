@@ -14,6 +14,7 @@ import math
 import pandas as pd
 import numpy as np
 import re
+import subprocess
 from multiprocessing import Pool,cpu_count
 
 
@@ -324,7 +325,7 @@ def printout(cnt):
 
 def output():
     
-    """function fro writing the csv of the calculated matrices
+    """function for writing the csv of the calculated matrices
     """
     
 
@@ -373,15 +374,31 @@ def output():
 
 def read_vcf_to_memory():
     df = []
-    ass=open('{}'.format(data.settings['vcf']))
+    
+    
+    proc = subprocess.Popen('gunzip -c {}'.format(data.settings['vcf']), shell=True, stdout=subprocess.PIPE)
+
+
     header = 0
-    cnt=0
-    for line in ass:
+    cnt=0    
+    
+    print(data.df['ffdg_positions_on_ctgs'])
+    contig = data.df['ffdg_positions_on_ctgs'].contig.values.tolist()[0]
+    lyst_check = data.df['ffdg_positions_on_ctgs'].loc[data.df['ffdg_positions_on_ctgs'].contig == contig].check.values.tolist()
+#    print(type(data.df['ffdg_positions_on_ctgs'].POS.values.tolist()[0]))
+#    sys.exit()
+
+
+    for line in proc.stdout:
+        line = str(line.rstrip())[2:-1].split(sep='\\t')
+#        print(line[:2], type(line[0]))
         cnt+=1
         if cnt % 1000 == 0:
-            print('reading vcf line:', cnt)
-        line = line.strip('\n')
-        line = line.split()
+            print('reading vcf line:', cnt)        
+
+
+#        line = line.strip('\n')
+#        line = line.split()
         if header == 0:
              match= re.search("^(#CHROM)", line[0])
              if match:
@@ -401,77 +418,98 @@ def read_vcf_to_memory():
                 df.append(temp_list)
                 header = temp_list
                 temp_list = []
+                
            
         else:
-            #first contig 
-            if line[0] != '#':
-                match= re.search("^(\S+)", line[0])
-                if match:
-                    line[0] = match.group(1)
-                    temp_list = [line[0]]
-                    temp_list.append(line[1])
-                    #transition or transversion?
-                    if  line[3] == 'A' and line[4] == 'G' or \
-                        line[3] == 'G' and line[4] == 'A' or \
-                        line[3] == 'C' and line[4] == 'T' or \
-                        line[3] == 'T' and line[4] == 'C':
-                            temp_list.append('ti')
-                    else:
-                            temp_list.append('tv')
-                    temp_list.append('no') #multi_var
-                    temp_list.extend(line[9:])
-                    #parsing AD-allele position
-                    for i in (i for i,x in enumerate(line[8].split(':')) if x == 'AD'):
-                        AD_pos = i
-                    #select values reference/variance mappings
-                    for i in range(len(temp_list[data.settings['sample_col']:])):
-                        if temp_list[i+data.settings['sample_col']][0] != '.':
-                            temp_list[i+data.settings['sample_col']] = temp_list[i+data.settings['sample_col']].split(sep=':')[AD_pos] #parsing vcf AD allele cov.
-                        else:
-                            temp_list[i+data.settings['sample_col']] = 'NA'
+#            print(header)
+            if len(line) == 0:
+                continue
+            if line[0][0] == '#':
+                continue
+#            print(line[0] + ',' + line[1])
+            
+            #update checklist for new contig (faster calculation)
+            if line[0] != contig:
+                contig = line[0]
+                lyst_check = data.df['ffdg_positions_on_ctgs'].loc[data.df['ffdg_positions_on_ctgs'].contig == contig].check.values.tolist()
+            
+            if line[0] + ',' + line[1] not in lyst_check:
+    #            print(line[:3])
+                continue
+            if True == True:
+    #            print('\t'.join(line))
+                print(line[:2], 'ffdg site')
+                
 
-                    if len(temp_list[data.settings['sample_col']].split(sep=',')) >= 2:            
-                        #is it multi-var?
-                        if len(temp_list[data.settings['sample_col']].split(sep=',')) > 2:
-                            for j in range(len(temp_list[data.settings['sample_col']].split(sep=','))-1):
-                                #create list
-                                temp_multi = temp_list.copy()
-                                #separate values for reference / variants on diff. columns
-                                temp_final = temp_multi.copy()
-                                temp_final.extend(['']*len(temp_multi[data.settings['sample_col']:]))
-                                #multi-var
-                                temp_final[3] = 'yes'
-                                #go trhough samples, make reference and variance column
-                                for i in range(len(temp_list[data.settings['sample_col']:])):
-                                    if temp_list[i+data.settings['sample_col']] != 'NA':
-                                        #separate values for reference / variants on diff. columns
-                                        temp_final[data.settings['sample_col']+i*2] = temp_multi[data.settings['sample_col']+i].split(sep=',')[0]
-                                        temp_final[data.settings['sample_col']+i*2+1] = temp_multi[data.settings['sample_col']+i].split(sep=',')[j+1]
-                                        
-                                    else:
-                                        #write NA's in two columns
-                                        temp_final[data.settings['sample_col']+i*2] = np.NaN #'NA'
-                                        temp_final[data.settings['sample_col']+i*2+1] = np.NaN #'NA'                         
-                                #print line                                
-                                df.append(temp_final)
-                                temp_final = []
-                                temp_multi = []
-                        #print single variants
-                        elif len(temp_list[data.settings['sample_col']].split(sep=',')) == 2:
+
+            #first contig 
+            match= re.search("^(\S+)", line[0])
+            if match:
+                line[0] = match.group(1)
+                temp_list = [line[0]]
+                temp_list.append(line[1])
+                #transition or transversion?
+                if  line[3] == 'A' and line[4] == 'G' or \
+                    line[3] == 'G' and line[4] == 'A' or \
+                    line[3] == 'C' and line[4] == 'T' or \
+                    line[3] == 'T' and line[4] == 'C':
+                        temp_list.append('ti')
+                else:
+                        temp_list.append('tv')
+                temp_list.append('no') #multi_var
+                temp_list.extend(line[9:])
+                #parsing AD-allele position
+                for i in (i for i,x in enumerate(line[8].split(':')) if x == 'AD'):
+                    AD_pos = i
+                #select values reference/variance mappings
+                for i in range(len(temp_list[data.settings['sample_col']:])):
+                    if temp_list[i+data.settings['sample_col']][0] != '.':
+                        temp_list[i+data.settings['sample_col']] = temp_list[i+data.settings['sample_col']].split(sep=':')[AD_pos] #parsing vcf AD allele cov.
+                    else:
+                        temp_list[i+data.settings['sample_col']] = 'NA'
+
+                if len(temp_list[data.settings['sample_col']].split(sep=',')) >= 2:            
+                    #is it multi-var?
+                    if len(temp_list[data.settings['sample_col']].split(sep=',')) > 2:
+                        for j in range(len(temp_list[data.settings['sample_col']].split(sep=','))-1):
+                            #create list
+                            temp_multi = temp_list.copy()
                             #separate values for reference / variants on diff. columns
-                            temp_final = temp_list.copy()
-                            temp_final.extend(['']*len(temp_list[data.settings['sample_col']:]))
+                            temp_final = temp_multi.copy()
+                            temp_final.extend(['']*len(temp_multi[data.settings['sample_col']:]))
+                            #multi-var
+                            temp_final[3] = 'yes'
+                            #go trhough samples, make reference and variance column
                             for i in range(len(temp_list[data.settings['sample_col']:])):
                                 if temp_list[i+data.settings['sample_col']] != 'NA':
-                                    temp_final[data.settings['sample_col']+i*2] = temp_list[data.settings['sample_col']+i].split(sep=',')[0]
-                                    temp_final[data.settings['sample_col']+i*2+1] = temp_list[data.settings['sample_col']+i].split(sep=',')[1]
+                                    #separate values for reference / variants on diff. columns
+                                    temp_final[data.settings['sample_col']+i*2] = temp_multi[data.settings['sample_col']+i].split(sep=',')[0]
+                                    temp_final[data.settings['sample_col']+i*2+1] = temp_multi[data.settings['sample_col']+i].split(sep=',')[j+1]
+                                    
                                 else:
-                                    temp_final[data.settings['sample_col']+i*2] = np.NaN
-                                    temp_final[data.settings['sample_col']+i*2+1] = np.NaN                      
+                                    #write NA's in two columns
+                                    temp_final[data.settings['sample_col']+i*2] = np.NaN #'NA'
+                                    temp_final[data.settings['sample_col']+i*2+1] = np.NaN #'NA'                         
+                            #print line                                
                             df.append(temp_final)
+                            temp_final = []
+                            temp_multi = []
+                    #print single variants
+                    elif len(temp_list[data.settings['sample_col']].split(sep=',')) == 2:
+                        #separate values for reference / variants on diff. columns
+                        temp_final = temp_list.copy()
+                        temp_final.extend(['']*len(temp_list[data.settings['sample_col']:]))
+                        for i in range(len(temp_list[data.settings['sample_col']:])):
+                            if temp_list[i+data.settings['sample_col']] != 'NA':
+                                temp_final[data.settings['sample_col']+i*2] = temp_list[data.settings['sample_col']+i].split(sep=',')[0]
+                                temp_final[data.settings['sample_col']+i*2+1] = temp_list[data.settings['sample_col']+i].split(sep=',')[1]
+                            else:
+                                temp_final[data.settings['sample_col']+i*2] = np.NaN
+                                temp_final[data.settings['sample_col']+i*2+1] = np.NaN                      
+                        df.append(temp_final)
         temp_list = []
     #store the vcf table
-    ass.close()
+#    ass.close()
     df = pd.DataFrame(df)
     df.columns = df.iloc[0]
     df = df.reindex(df.index.drop(0))
@@ -522,6 +560,7 @@ def get_pos_ffdg_on_contigs():
                 lyst_fa[header] = seq
                 header = line.split()[0][1:] #parsing fasta header for gene name
                 seq = ''
+                #small adaption for names followed by point and numerations
                 if '.' in header:
                     genes_contain_points = 'yes'
             else:
@@ -558,6 +597,7 @@ def get_pos_ffdg_on_contigs():
     #make cds positions index
     cds_positions = [['contig', 'POS']]
     
+    
     cc = {}
     for line in gff:
         if line[0] != '>':
@@ -577,7 +617,8 @@ def get_pos_ffdg_on_contigs():
                             if genes_contain_points == 'no':
                                 gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0].split('.')[0] #Bgt
                             elif genes_contain_points == 'yes':
-                               gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0]                #Cladonia
+                                gene = line[8].split(sep='ID=')[1].split(sep=':')[0].split(sep=';')[0]                #Cladonia
+#                               gene = line[8].split(sep='Name=')[1].split(sep=':')[0].split(sep=';')[0]                #Bgt maker
                             if gene not in cc:
                                 cc[gene] = []
                                 cc[gene].append([line[0], gene, line[3], line[4], line[6], 
@@ -593,14 +634,9 @@ def get_pos_ffdg_on_contigs():
 #                                 
 #                                 append positions to cds_positions
 # =============================================================================
-                            for i in range(int(line[4])-int(line[3])+1):
-                                contig = line[0]
-                                pos = str(i + int(line[3]))
-                                cds_positions.append([contig, pos])
         else:
             break
     gff.close()
-    cds_positions = pd.DataFrame(cds_positions[1:], columns=cds_positions[0])
                                                                                                            
     for i in cc:
         cc[i] = pd.DataFrame(cc[i])
@@ -639,7 +675,7 @@ def get_pos_ffdg_on_contigs():
     del pos_fa
     
     print()
-    print('..determine 4fold-degenarate snps in snp.vcf..')
+    print('..determine 4fold-degenerate snps in snp.vcf..')
     print()
 
 
@@ -647,7 +683,7 @@ def get_pos_ffdg_on_contigs():
     ffdg_positions_on_ctgs = pd.DataFrame(pos_con[1:], columns = pos_con[0])
     del pos_con
     data.df['ffdg_positions_on_ctgs'] = ffdg_positions_on_ctgs
-    data.df['cds_positions'] = cds_positions
+#    data.df['cds_positions'] = cds_positions
     
     #store ffdgs positon in csv
     if  data.settings['ffdg_pos_output'] == 1:
@@ -734,9 +770,9 @@ if __name__ == "__main__":
 # =============================================================================
 
 
-    read_vcf_to_memory()
-    get_pos_ffdg_on_contigs()
 
+    get_pos_ffdg_on_contigs()
+    read_vcf_to_memory()
 
     #prepare list with jobs
     prepare_multiprocess()

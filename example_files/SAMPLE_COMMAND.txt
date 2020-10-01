@@ -1,1 +1,1 @@
-vcf_4fold_degenerate_dating.py --transcript example.cds.fasta --gff example.gff --vcf example.vcf
+vcf_4fold_degenerate_dating.py --transcript example.cds.fasta --gff example.gff --vcf example.vcf.gz
