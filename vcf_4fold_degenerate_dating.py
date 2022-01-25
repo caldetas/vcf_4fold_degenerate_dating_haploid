@@ -74,14 +74,7 @@ def pd_print(df):
 
     """Small function for printing pandas dataframe with header
     """
-
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        df = df.reindex()
-        df = df.set_index(df.iloc[:,0])
-        df = df.reindex()
-        del df[df.columns[0]]
-        del df.index.name
-        print(df)
+    print(df.to_string())
     return
 
 
@@ -296,13 +289,13 @@ def printout(cnt):
     df = df.set_index(df.iloc[:,0])
     df.columns = df.iloc[0,:]
     df = df.reindex(df.index.drop(temp))
-
+    print(df)
     del df[temp]
-    del df.index.name
+    # del df.index.name
     #store divergence dataframe in dictionary
 
 
-    print(df)
+    # print(df)
 
 
     print()
@@ -313,9 +306,7 @@ def printout(cnt):
     print()
 
     #print whole results df
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-        print(df)
-    print()
+    print(df.to_string())
     print()
     print()
     print()
@@ -511,6 +502,7 @@ def read_vcf_to_memory():
     #store the vcf table
 #    ass.close()
     df = pd.DataFrame(df)
+    print(df)
     df.columns = df.iloc[0]
     df = df.reindex(df.index.drop(0))
     df = df.reset_index(drop=True)
@@ -700,7 +692,6 @@ def get_pos_ffdg_on_contigs():
 if __name__ == "__main__": 
 
     #define variables in class
-    data.settings['vcf'] = 0
     data.settings['variant'] = 'single'
     data.settings['save_filtered_vcfs'] = 0
     data.settings['mincov'] = 0
@@ -755,7 +746,7 @@ if __name__ == "__main__":
            data.settings['div_t_df'] = 1
        elif opt == '--cores':
            data.settings['cores'] = int(arg)
-    if sys.argv[1:] == []:
+    if sys.argv[1:] == [] or 'transcript' not in data.settings or 'gff' not in data.settings or 'vcf' not in data.settings:
           print ('{}'.format(form))
           sys.exit()
 
